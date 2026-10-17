@@ -189,7 +189,7 @@ final class SystemScannerService: ObservableObject {
                 actionLabel: "Limpiar Artefactos",
                 potentialSavingsBytes: allArtifactsBytes,
                 safety: .safe,
-                targetTab: .devAndDocker,
+                targetTab: .appleSilicon,
                 icon: "folder.fill.badge.gearshape"
             ))
         }
@@ -227,7 +227,7 @@ final class SystemScannerService: ObservableObject {
                 actionLabel: "Activar Ahora",
                 potentialSavingsBytes: 0,
                 safety: .safe,
-                targetTab: .automation,
+                targetTab: .dashboard,
                 icon: "clock.badge.checkmark.fill"
             ))
         }
@@ -240,13 +240,13 @@ final class SystemScannerService: ObservableObject {
         case .smartCaches:
             selectOnlySafeCaches()
             await cleanSelectedCaches()
-        case .devAndDocker:
+        case .appleSilicon:
             await cleanSelectedProjectArtifacts()
         case .uninstaller:
             if !orphanedLeftovers.isEmpty && rec.title.contains("Huérfanos") {
                 await cleanSelectedOrphans()
             }
-        case .automation:
+        case .dashboard:
             installOrUpdateSchedule()
         default:
             break

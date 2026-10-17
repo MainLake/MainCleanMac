@@ -34,11 +34,11 @@ enum MSeriesOptimizationKind: String, CaseIterable {
 
     var color: Color {
         switch self {
-        case .binaryArchitecture: return .cyan
-        case .neuralAndAIModels: return .purple
-        case .apfsSnapshotsAndSwap: return .mint
+        case .binaryArchitecture: return RamanTheme.laserCyan
+        case .neuralAndAIModels: return RamanTheme.antiStokesViolet
+        case .apfsSnapshotsAndSwap: return RamanTheme.emeraldSafe
         case .sqliteVacuum: return .blue
-        case .backgroundAgents: return .orange
+        case .backgroundAgents: return RamanTheme.stokesAmber
         }
     }
 }
@@ -82,34 +82,39 @@ struct AppleAppArchInfo: Identifiable, Hashable {
     }
 
     var badgeColor: Color {
-        if isUniversal { return .cyan }
-        if isIntelOnly { return .orange }
-        return .green
+        if isUniversal { return RamanTheme.laserCyan }
+        if isIntelOnly { return RamanTheme.stokesAmber }
+        return RamanTheme.emeraldSafe
     }
 }
 
 struct AppleSiliconOptimizerView: View {
     @EnvironmentObject var scanner: SystemScannerService
-    @State private var selectedSection: Int = 0 // 0 = Optimizaciones M-Series, 1 = Inspector de Arquitecturas (arm64 vs x86_64)
+    // 4 Strictly Separated Sub-Tabs:
+    // 0 = Optimizador M-Series
+    // 1 = Binarios Mach-O (arm64 vs Intel)
+    // 2 = Artefactos de Código (node_modules / .venv)
+    // 3 = Contenedores Docker
+    @State private var selectedSection: Int = 0
     @State private var itemPendingConfirm: MSeriesDeepItem?
     @State private var appPendingThin: AppleAppArchInfo?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
+            // Top Lens Header
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Motor Apple Silicon (\(scanner.mSeriesStatus.chipName))")
+                        Text("Núcleo Chip M")
                             .font(.system(size: 26, weight: .bold, design: .rounded))
-                        Text("ARM64 NATIVO")
-                            .font(.system(size: 10, weight: .heavy))
-                            .foregroundStyle(.mint)
+                        Text(scanner.mSeriesStatus.chipName.uppercased())
+                            .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                            .foregroundStyle(RamanTheme.emeraldSafe)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(Color.mint.opacity(0.16), in: Capsule())
+                            .background(RamanTheme.emeraldSafe.opacity(0.16), in: Capsule())
                     }
-                    Text("Optimización profunda de bajo nivel diseñada exclusivamente para procesadores M1 / M2 / M3 / M4.")
+                    Text("Ingeniería de bajo nivel para Apple Silicon, binarios arm64, proyectos de código y Docker.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -117,14 +122,24 @@ struct AppleSiliconOptimizerView: View {
                 Spacer()
 
                 Picker("", selection: $selectedSection) {
-                    Text("Optimizador Profundo (\(scanner.mSeriesItems.count))").tag(0)
-                    Text("Arquitectura de Apps (\(scanner.appArchitectures.count))").tag(1)
+                    Text("Motor M-Series").tag(0)
+                    Text("Binarios arm64").tag(1)
+                    Text("Proyectos (\(scanner.projectArtifacts.count))").tag(2)
+                    Text("Docker").tag(3)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 340)
+                .frame(width: 470)
 
                 Button {
-                    Task { await scanner.scanAppleSiliconDeep() }
+                    Task {
+                        if selectedSection == 0 || selectedSection == 1 {
+                            await scanner.scanAppleSiliconDeep()
+                        } else if selectedSection == 2 {
+                            await scanner.scanProjectArtifacts()
+                        } else {
+                            await scanner.refreshDocker()
+                        }
+                    }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
@@ -135,229 +150,21 @@ struct AppleSiliconOptimizerView: View {
             .padding(.vertical, 20)
             .onAppear {
                 scanner.ensureMSeriesLoaded()
+                scanner.ensureDevAndDockerLoaded()
             }
 
             Divider().overlay(Color.white.opacity(0.07))
 
-            if scanner.isScanningMSeries && scanner.mSeriesItems.isEmpty {
-                VStack(spacing: 14) {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                    Text("Inspeccionando binarios Mach-O arm64/x86_64, memoria unificada, snapshots APFS y bases SQLite...")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 22) {
-                        // Hardware Telemetry Cards
-                        HStack(spacing: 14) {
-                            MSeriesTelemetryCard(
-                                title: scanner.mSeriesStatus.chipName,
-                                value: "\(scanner.mSeriesStatus.physicalRAMGB) GB RAM Unificada",
-                                subtitle: "Swap activo en SSD: \(ByteFormatter.string(from: scanner.mSeriesStatus.swapUsedBytes))",
-                                icon: "cpu.fill",
-                                color: .mint
-                            )
-
-                            MSeriesTelemetryCard(
-                                title: "Binarios Universales / Intel",
-                                value: "\(scanner.mSeriesStatus.universalAppsCount) Universales · \(scanner.mSeriesStatus.intelOnlyAppsCount) Rosetta",
-                                subtitle: "Código x86_64 redundante: ~\(ByteFormatter.string(from: scanner.mSeriesStatus.estimatedIntelBinaryWasteBytes))",
-                                icon: "square.stack.3d.forward.dottedline.fill",
-                                color: .cyan
-                            )
-
-                            MSeriesTelemetryCard(
-                                title: "Instantáneas APFS & SQLite",
-                                value: "\(scanner.mSeriesStatus.localSnapshotsCount) Snapshots locales",
-                                subtitle: "Bases SQLite compactables: \(ByteFormatter.string(from: scanner.mSeriesStatus.totalVacuumableSQLiteBytes))",
-                                icon: "cylinder.split.1x2.fill",
-                                color: .purple
-                            )
-                        }
-
-                        if selectedSection == 0 {
-                            // Deep M-Series Optimizations
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Text("Optimizaciones de Bajo Nivel para Familia M")
-                                        .font(.headline)
-                                    Spacer()
-                                    Button {
-                                        Task { await scanner.runAllSafeMSeriesOptimizations() }
-                                    } label: {
-                                        Label("Ejecutar Todas las Seguras", systemImage: "bolt.shield.fill")
-                                            .font(.caption.weight(.semibold))
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .tint(.mint)
-                                    .disabled(scanner.isExecutingOperation)
-                                }
-
-                                ForEach(scanner.mSeriesItems) { item in
-                                    HStack(spacing: 14) {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .fill(item.kind.color.opacity(0.16))
-                                                .frame(width: 40, height: 40)
-                                            Image(systemName: item.kind.icon)
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundStyle(item.kind.color)
-                                        }
-
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            HStack(spacing: 8) {
-                                                Text(item.title)
-                                                    .font(.subheadline.weight(.semibold))
-                                                Text(item.kind.rawValue)
-                                                    .font(.system(size: 9, weight: .bold))
-                                                    .foregroundStyle(item.kind.color)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(item.kind.color.opacity(0.14), in: Capsule())
-                                                SafetyBadgeView(level: item.safety)
-                                            }
-                                            Text(item.subtitle)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                            Text(item.technicalDetail)
-                                                .font(.caption2.monospaced())
-                                                .foregroundStyle(.secondary.opacity(0.75))
-                                                .lineLimit(1)
-                                        }
-
-                                        Spacer()
-
-                                        if item.sizeBytes > 0 {
-                                            Text(ByteFormatter.string(from: item.sizeBytes))
-                                                .font(.system(.callout, design: .rounded).monospacedDigit().bold())
-                                                .foregroundStyle(.cyan)
-                                        }
-
-                                        if let path = item.targetPath {
-                                            Button {
-                                                scanner.revealInFinder(path: path)
-                                            } label: {
-                                                Image(systemName: "magnifyingglass")
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                                    .frame(width: 26, height: 26)
-                                                    .background(Color.white.opacity(0.06), in: Circle())
-                                            }
-                                            .buttonStyle(.plain)
-                                            .help("Ver en Finder")
-                                        }
-
-                                        Button {
-                                            if item.safety == .caution {
-                                                itemPendingConfirm = item
-                                            } else {
-                                                Task { await scanner.executeMSeriesOptimization(item) }
-                                            }
-                                        } label: {
-                                            Text(item.actionButtonTitle)
-                                                .font(.caption.weight(.semibold))
-                                                .padding(.horizontal, 10)
-                                                .padding(.vertical, 5)
-                                        }
-                                        .buttonStyle(.borderedProminent)
-                                        .tint(item.safety == .safe ? .cyan : .orange)
-                                        .disabled(scanner.isExecutingOperation)
-                                    }
-                                    .padding(14)
-                                    .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                                    )
-                                }
-                            }
-                        } else {
-                            // App Binary Architecture Inspector (arm64 vs x86_64)
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Inspector de Binarios Mach-O (Apple Silicon arm64 vs Intel x86_64)")
-                                            .font(.headline)
-                                        Text("Las apps 'Universal' incluyen dos copias del código ejecutable: una para tu chip M y otra para procesadores Intel antiguos. Nota: Las apps de Apple o con firma estricta están protegidas para no romper su sello criptográfico.")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                }
-
-                                ForEach(scanner.appArchitectures) { app in
-                                    HStack(spacing: 14) {
-                                        Image(nsImage: NSWorkspace.shared.icon(forFile: app.bundlePath))
-                                            .resizable()
-                                            .frame(width: 34, height: 34)
-
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            HStack(spacing: 8) {
-                                                Text(app.name)
-                                                    .font(.subheadline.weight(.semibold))
-                                                Text(app.archLabel)
-                                                    .font(.system(size: 10, weight: .bold))
-                                                    .foregroundStyle(app.badgeColor)
-                                                    .padding(.horizontal, 7)
-                                                    .padding(.vertical, 2)
-                                                    .background(app.badgeColor.opacity(0.14), in: Capsule())
-                                            }
-                                            Text("Peso total: \(ByteFormatter.string(from: app.totalAppSize)) · Arquitecturas: \(app.architectures.joined(separator: ", "))")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-
-                                        Spacer()
-
-                                        if app.isUniversal {
-                                            VStack(alignment: .trailing, spacing: 2) {
-                                                Text("~\(ByteFormatter.string(from: app.estimatedIntelSliceBytes))")
-                                                    .font(.subheadline.monospacedDigit().bold())
-                                                    .foregroundStyle(.cyan)
-                                                Text("Slice x86_64")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                            }
-
-                                            if app.isAppleSignedOrAppStore {
-                                                Text("Firma Protegida")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                                    .padding(.horizontal, 8)
-                                                    .padding(.vertical, 4)
-                                                    .background(Color.white.opacity(0.05), in: Capsule())
-                                                    .help("App protegida por sello de App Store / Apple. No se modifica para garantizar estabilidad.")
-                                            } else {
-                                                Button {
-                                                    appPendingThin = app
-                                                } label: {
-                                                    Text("Adelgazar a arm64")
-                                                        .font(.caption.weight(.semibold))
-                                                }
-                                                .buttonStyle(.bordered)
-                                                .disabled(scanner.isExecutingOperation)
-                                            }
-                                        } else if app.isIntelOnly {
-                                            Text("Requiere Rosetta 2")
-                                                .font(.caption2.bold())
-                                                .foregroundStyle(.orange)
-                                        } else {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundStyle(.green)
-                                                .help("100% Nativo Apple Silicon")
-                                        }
-                                    }
-                                    .padding(12)
-                                    .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
-                                }
-                            }
-                        }
-                    }
-                    .padding(28)
-                }
+            // Render strictly ONE sub-tool at a time
+            switch selectedSection {
+            case 0:
+                mSeriesDeepSubView
+            case 1:
+                binaryArchInspectorSubView
+            case 2:
+                ProjectArtifactsSubView()
+            default:
+                DockerManagerView()
             }
         }
         .alert(
@@ -399,6 +206,242 @@ struct AppleSiliconOptimizerView: View {
             }
         }
     }
+
+    // MARK: - Sub-Tab 0: Deep M-Series Optimizations
+
+    private var mSeriesDeepSubView: some View {
+        Group {
+            if scanner.isScanningMSeries && scanner.mSeriesItems.isEmpty {
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .tint(RamanTheme.emeraldSafe)
+                    Text("Analizando memoria unificada, snapshots APFS y bases SQLite...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        HStack(spacing: 14) {
+                            MSeriesTelemetryCard(
+                                title: scanner.mSeriesStatus.chipName,
+                                value: "\(scanner.mSeriesStatus.physicalRAMGB) GB RAM Unificada",
+                                subtitle: "Swap en SSD: \(ByteFormatter.string(from: scanner.mSeriesStatus.swapUsedBytes))",
+                                icon: "cpu.fill",
+                                color: RamanTheme.emeraldSafe
+                            )
+
+                            MSeriesTelemetryCard(
+                                title: "Binarios Universales / Intel",
+                                value: "\(scanner.mSeriesStatus.universalAppsCount) Universales · \(scanner.mSeriesStatus.intelOnlyAppsCount) Rosetta",
+                                subtitle: "Código x86_64 redundante: ~\(ByteFormatter.string(from: scanner.mSeriesStatus.estimatedIntelBinaryWasteBytes))",
+                                icon: "square.stack.3d.forward.dottedline.fill",
+                                color: RamanTheme.laserCyan
+                            )
+
+                            MSeriesTelemetryCard(
+                                title: "Instantáneas APFS & SQLite",
+                                value: "\(scanner.mSeriesStatus.localSnapshotsCount) Snapshots locales",
+                                subtitle: "Bases SQLite compactables: \(ByteFormatter.string(from: scanner.mSeriesStatus.totalVacuumableSQLiteBytes))",
+                                icon: "cylinder.split.1x2.fill",
+                                color: RamanTheme.antiStokesViolet
+                            )
+                        }
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("OPTIMIZACIONES DE BAJO NIVEL PARA FAMILIA M")
+                                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button {
+                                    Task { await scanner.runAllSafeMSeriesOptimizations() }
+                                } label: {
+                                    Label("Ejecutar Todas las Seguras", systemImage: "bolt.shield.fill")
+                                        .font(.caption.weight(.bold))
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(RamanTheme.emeraldSafe)
+                                .foregroundStyle(.black)
+                                .disabled(scanner.isExecutingOperation)
+                            }
+
+                            ForEach(scanner.mSeriesItems) { item in
+                                HStack(spacing: 14) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(item.kind.color.opacity(0.16))
+                                            .frame(width: 40, height: 40)
+                                        Image(systemName: item.kind.icon)
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(item.kind.color)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        HStack(spacing: 8) {
+                                            Text(item.title)
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(item.kind.rawValue)
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundStyle(item.kind.color)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(item.kind.color.opacity(0.14), in: Capsule())
+                                            SafetyBadgeView(level: item.safety)
+                                        }
+                                        Text(item.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Text(item.technicalDetail)
+                                            .font(.caption2.monospaced())
+                                            .foregroundStyle(.secondary.opacity(0.75))
+                                            .lineLimit(1)
+                                    }
+
+                                    Spacer()
+
+                                    if item.sizeBytes > 0 {
+                                        Text(ByteFormatter.string(from: item.sizeBytes))
+                                            .font(.system(.callout, design: .rounded).monospacedDigit().bold())
+                                            .foregroundStyle(RamanTheme.laserCyan)
+                                    }
+
+                                    if let path = item.targetPath {
+                                        Button {
+                                            scanner.revealInFinder(path: path)
+                                        } label: {
+                                            Image(systemName: "magnifyingglass")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .frame(width: 26, height: 26)
+                                                .background(Color.white.opacity(0.06), in: Circle())
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("Ver en Finder")
+                                    }
+
+                                    Button {
+                                        if item.safety == .caution {
+                                            itemPendingConfirm = item
+                                        } else {
+                                            Task { await scanner.executeMSeriesOptimization(item) }
+                                        }
+                                    } label: {
+                                        Text(item.actionButtonTitle)
+                                            .font(.caption.weight(.semibold))
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(item.safety == .safe ? RamanTheme.laserCyan : RamanTheme.stokesAmber)
+                                    .foregroundStyle(.black)
+                                    .disabled(scanner.isExecutingOperation)
+                                }
+                                .padding(14)
+                                .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(RamanTheme.borderSubtle, lineWidth: 1)
+                                )
+                            }
+                        }
+                    }
+                    .padding(28)
+                }
+            }
+        }
+    }
+
+    // MARK: - Sub-Tab 1: Mach-O Binary Inspector (arm64 vs x86_64)
+
+    private var binaryArchInspectorSubView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("INSPECTOR DE BINARIOS MACH-O (ARM64 VS INTEL X86_64)")
+                            .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                            .foregroundStyle(RamanTheme.laserCyan)
+                        Text("Las aplicaciones 'Universal' contienen binarios duplicados para chips Intel y Apple Silicon. Las apps con sello criptográfico de Apple o App Store están protegidas.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+
+                ForEach(scanner.appArchitectures) { app in
+                    HStack(spacing: 14) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: app.bundlePath))
+                            .resizable()
+                            .frame(width: 34, height: 34)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 8) {
+                                Text(app.name)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(app.archLabel)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(app.badgeColor)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(app.badgeColor.opacity(0.14), in: Capsule())
+                            }
+                            Text("Peso total: \(ByteFormatter.string(from: app.totalAppSize)) · Arquitecturas: \(app.architectures.joined(separator: ", "))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        if app.isUniversal {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("~\(ByteFormatter.string(from: app.estimatedIntelSliceBytes))")
+                                    .font(.subheadline.monospacedDigit().bold())
+                                    .foregroundStyle(RamanTheme.laserCyan)
+                                Text("Slice x86_64")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            if app.isAppleSignedOrAppStore {
+                                Text("Firma Protegida")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.05), in: Capsule())
+                            } else {
+                                Button {
+                                    appPendingThin = app
+                                } label: {
+                                    Text("Adelgazar a arm64")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(scanner.isExecutingOperation)
+                            }
+                        } else if app.isIntelOnly {
+                            Text("Requiere Rosetta 2")
+                                .font(.caption2.bold())
+                                .foregroundStyle(RamanTheme.stokesAmber)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(RamanTheme.emeraldSafe)
+                        }
+                    }
+                    .padding(12)
+                    .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(RamanTheme.borderSubtle, lineWidth: 1)
+                    )
+                }
+            }
+            .padding(28)
+        }
+    }
 }
 
 struct MSeriesTelemetryCard: View {
@@ -427,10 +470,10 @@ struct MSeriesTelemetryCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+        .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(color.opacity(0.22), lineWidth: 1)
+                .stroke(color.opacity(0.25), lineWidth: 1)
         )
     }
 }

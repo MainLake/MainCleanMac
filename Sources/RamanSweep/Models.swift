@@ -1,55 +1,42 @@
 import Foundation
 import SwiftUI
 
-enum NavigationSection: String, CaseIterable {
-    case general = "PRINCIPAL"
-    case advanced = "AVANZADO"
-}
-
 enum NavigationTab: String, CaseIterable, Identifiable {
-    case dashboard = "Smart Care"
-    case appleSilicon = "Motor Chip M"
-    case systemDataXRay = "Rayos X Sistema"
-    case smartCaches = "Limpieza"
+    case dashboard = "Pulso Raman"
+    case smartCaches = "Barrido Láser"
     case uninstaller = "Aplicaciones"
-    case spaceLens = "Explorador"
-    case devAndDocker = "Zona Dev & Docker"
-    case automation = "Automatización"
+    case appleSilicon = "Núcleo Chip M"
+    case spaceLens = "Espectro Disco"
 
     var id: String { rawValue }
 
-    var section: NavigationSection {
+    var tagline: String {
         switch self {
-        case .dashboard, .appleSilicon, .systemDataXRay, .smartCaches, .uninstaller, .spaceLens:
-            return .general
-        case .devAndDocker, .automation:
-            return .advanced
+        case .dashboard: return "ESTADO GENERAL Y SALUD"
+        case .smartCaches: return "PURGA DE CACHÉS Y BASURA"
+        case .uninstaller: return "APPS Y RESIDUOS HUÉRFANOS"
+        case .appleSilicon: return "BINARIOS ARM64, DOCKER Y CÓDIGO"
+        case .spaceLens: return "RAYOS X Y MAPA DE CARPETAS"
         }
     }
 
     var icon: String {
         switch self {
-        case .dashboard: return "sparkles.rectangle.stack.fill"
+        case .dashboard: return "waveform.path.ecg"
+        case .smartCaches: return "laser.burst"
+        case .uninstaller: return "square.stack.3d.up.fill"
         case .appleSilicon: return "cpu.fill"
-        case .systemDataXRay: return "waveform.path.ecg.rectangle.fill"
-        case .smartCaches: return "paintbrush.pointed.fill"
-        case .uninstaller: return "square.grid.2x2.fill"
-        case .spaceLens: return "chart.pie.fill"
-        case .devAndDocker: return "terminal.fill"
-        case .automation: return "clock.badge.checkmark.fill"
+        case .spaceLens: return "prism.fill"
         }
     }
 
     var accentColor: Color {
         switch self {
-        case .dashboard: return .cyan
-        case .appleSilicon: return .mint
-        case .systemDataXRay: return .teal
-        case .smartCaches: return .purple
-        case .uninstaller: return .pink
-        case .spaceLens: return .orange
-        case .devAndDocker: return .blue
-        case .automation: return .green
+        case .dashboard: return RamanTheme.laserCyan
+        case .smartCaches: return RamanTheme.stokesAmber
+        case .uninstaller: return Color(red: 0.96, green: 0.36, blue: 0.62)
+        case .appleSilicon: return RamanTheme.emeraldSafe
+        case .spaceLens: return RamanTheme.antiStokesViolet
         }
     }
 }

@@ -1,11 +1,12 @@
 import SwiftUI
+import AppKit
 
 struct AppUninstallerView: View {
     @EnvironmentObject var scanner: SystemScannerService
+    @State private var selectedApp: InstalledAppInfo?
     @State private var selectedAppForUninstall: InstalledAppInfo?
-    @State private var inspectedApp: InstalledAppInfo?
     @State private var searchText = ""
-    @State private var mode: Int = 0 // 0 = Aplicaciones, 1 = Residuos Huérfanos
+    @State private var mode: Int = 0 // 0 = Aplicaciones Instaladas, 1 = Residuos Huérfanos
 
     var filteredApps: [InstalledAppInfo] {
         if searchText.isEmpty { return scanner.installedApps }
@@ -15,14 +16,29 @@ struct AppUninstallerView: View {
         }
     }
 
+    var activeInspectedApp: InstalledAppInfo? {
+        if let sel = selectedApp, filteredApps.contains(where: { $0.id == sel.id }) {
+            return sel
+        }
+        return filteredApps.first
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
+            // Top Lens Header
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Aplicaciones y Residuos")
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                    Text("Desinstala aplicaciones por completo sin dejar carpetas olvidadas en tu Mac.")
+                    HStack(spacing: 10) {
+                        Text("Aplicaciones")
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                        Text("DESINSTALADOR PROFUNDO")
+                            .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                            .foregroundStyle(Color(red: 0.96, green: 0.36, blue: 0.62))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color(red: 0.96, green: 0.36, blue: 0.62).opacity(0.14), in: Capsule())
+                    }
+                    Text("Selecciona una aplicación a la izquierda para inspeccionar todas sus carpetas ocultas y desinstalarla sin dejar rastro.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -36,12 +52,6 @@ struct AppUninstallerView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 260)
 
-                if mode == 0 {
-                    TextField("Buscar...", text: $searchText)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 160)
-                }
-
                 Menu {
                     Button {
                         scanner.openAppManagementSettings()
@@ -54,7 +64,7 @@ struct AppUninstallerView: View {
                         Label("Abrir 'Acceso total al disco'", systemImage: "externaldrive.badge.checkmark")
                     }
                 } label: {
-                    Label("Permisos sin Contraseña", systemImage: "lock.open.fill")
+                    Label("Permisos TCC", systemImage: "lock.open.fill")
                         .font(.caption.weight(.semibold))
                 }
                 .menuStyle(.borderedButton)
@@ -81,84 +91,252 @@ struct AppUninstallerView: View {
                 VStack(spacing: 14) {
                     ProgressView()
                         .scaleEffect(1.15)
-                    Text("Escaneando aplicaciones instaladas y sus archivos asociados...")
+                        .tint(RamanTheme.laserCyan)
+                    Text("Rastreando aplicaciones en /Applications y sus residuos en ~/Library...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if mode == 0 {
-                // Installed Apps Mode
-                ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(filteredApps) { app in
-                            HStack(spacing: 14) {
+                // Master-Detail Split Layout for Applications
+                HStack(spacing: 0) {
+                    // Left Column: Search + App List
+                    VStack(spacing: 0) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            TextField("Filtrar aplicación...", text: $searchText)
+                                .textFieldStyle(.plain)
+                                .font(.subheadline)
+                            if !searchText.isEmpty {
+                                Button {
+                                    searchText = ""
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(10)
+                        .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(RamanTheme.borderSubtle, lineWidth: 1)
+                        )
+                        .padding(14)
+
+                        Divider().overlay(RamanTheme.borderSubtle)
+
+                        ScrollView {
+                            LazyVStack(spacing: 6) {
+                                ForEach(filteredApps) { app in
+                                    let isSelected = activeInspectedApp?.id == app.id
+                                    Button {
+                                        selectedApp = app
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Image(nsImage: NSWorkspace.shared.icon(forFile: app.bundlePath))
+                                                .resizable()
+                                                .frame(width: 34, height: 34)
+
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(app.name)
+                                                    .font(.system(size: 13, weight: isSelected ? .bold : .medium, design: .rounded))
+                                                    .foregroundStyle(.white)
+                                                    .lineLimit(1)
+
+                                                Text("\(app.leftovers.count) residuos · \(ByteFormatter.string(from: app.leftoversSizeBytes))")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(app.leftovers.isEmpty ? .secondary : RamanTheme.laserCyan)
+                                            }
+
+                                            Spacer()
+
+                                            Text(ByteFormatter.string(from: app.totalSizeBytes))
+                                                .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
+                                                .foregroundStyle(isSelected ? .white : .secondary)
+                                        }
+                                        .padding(10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 11)
+                                                .fill(isSelected ? RamanTheme.panelBg : Color.clear)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 11)
+                                                .stroke(isSelected ? RamanTheme.laserCyan.opacity(0.45) : Color.clear, lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(12)
+                        }
+                    }
+                    .frame(width: 320)
+                    .background(Color.black.opacity(0.16))
+
+                    Rectangle()
+                        .fill(RamanTheme.borderSubtle)
+                        .frame(width: 1)
+
+                    // Right Column: Full App Inspector & Leftover Breakdown
+                    if let app = activeInspectedApp {
+                        VStack(alignment: .leading, spacing: 20) {
+                            // App Hero Card
+                            HStack(spacing: 18) {
                                 Image(nsImage: NSWorkspace.shared.icon(forFile: app.bundlePath))
                                     .resizable()
-                                    .frame(width: 38, height: 38)
+                                    .frame(width: 64, height: 64)
 
-                                VStack(alignment: .leading, spacing: 3) {
+                                VStack(alignment: .leading, spacing: 5) {
                                     HStack(spacing: 8) {
                                         Text(app.name)
-                                            .font(.subheadline.weight(.semibold))
+                                            .font(.system(size: 22, weight: .bold, design: .rounded))
                                         if app.isSystemOrProtected {
                                             SafetyBadgeView(level: .protected)
                                         } else if app.requiresAdminToTrash {
-                                            Text("App Store / Admin")
-                                                .font(.system(size: 9, weight: .semibold))
-                                                .foregroundStyle(.orange)
-                                                .padding(.horizontal, 6)
+                                            Text("App Store / Root")
+                                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                                .foregroundStyle(RamanTheme.stokesAmber)
+                                                .padding(.horizontal, 8)
                                                 .padding(.vertical, 2)
-                                                .background(Color.orange.opacity(0.14), in: Capsule())
+                                                .background(RamanTheme.stokesAmber.opacity(0.15), in: Capsule())
                                         }
                                     }
 
-                                    HStack(spacing: 10) {
-                                        Text("App: \(ByteFormatter.string(from: app.appSizeBytes))")
+                                    Text(app.bundleId)
+                                        .font(.caption.monospaced())
+                                        .foregroundStyle(.secondary)
+
+                                    HStack(spacing: 16) {
+                                        Label("Paquete .app: \(ByteFormatter.string(from: app.appSizeBytes))", systemImage: "app.fill")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
-                                        if !app.leftovers.isEmpty {
-                                            Button {
-                                                inspectedApp = app
-                                            } label: {
-                                                Text("+ \(app.leftovers.count) residuos (\(ByteFormatter.string(from: app.leftoversSizeBytes)))")
-                                                    .font(.caption.weight(.medium))
-                                                    .foregroundStyle(.cyan)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
+                                        Label("Residuos en ~/Library: \(ByteFormatter.string(from: app.leftoversSizeBytes))", systemImage: "folder.fill.badge.gearshape")
+                                            .font(.caption)
+                                            .foregroundStyle(RamanTheme.laserCyan)
                                     }
                                 }
 
                                 Spacer()
 
-                                Text(ByteFormatter.string(from: app.totalSizeBytes))
-                                    .font(.system(.callout, design: .rounded).monospacedDigit().bold())
-                                    .foregroundStyle(.primary)
+                                VStack(alignment: .trailing, spacing: 8) {
+                                    Text(ByteFormatter.string(from: app.totalSizeBytes))
+                                        .font(.system(size: 24, weight: .black, design: .rounded).monospacedDigit())
+                                        .foregroundStyle(.white)
 
-                                if !app.isSystemOrProtected {
-                                    Button(role: .destructive) {
-                                        selectedAppForUninstall = app
-                                    } label: {
-                                        Text("Desinstalar")
-                                            .font(.caption.weight(.semibold))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
+                                    if !app.isSystemOrProtected {
+                                        Button(role: .destructive) {
+                                            selectedAppForUninstall = app
+                                        } label: {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "trash.fill")
+                                                Text("Desinstalar Completo")
+                                                    .fontWeight(.bold)
+                                            }
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 7)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(RamanTheme.infraredRed)
+                                        .disabled(scanner.isExecutingOperation)
                                     }
-                                    .buttonStyle(.borderedProminent)
-                                    .tint(.red.opacity(0.85))
-                                    .disabled(scanner.isExecutingOperation)
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+                            .padding(20)
+                            .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 16))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(RamanTheme.borderSubtle, lineWidth: 1)
                             )
+
+                            // Associated Files & Leftovers List
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Text("MAPA DE ARCHIVOS QUE SE ELIMINARÁN (\(app.leftovers.count + 1) RUTAS)")
+                                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Button("Ver .app en Finder") {
+                                        scanner.revealInFinder(path: app.bundlePath)
+                                    }
+                                    .font(.caption)
+                                    .buttonStyle(.link)
+                                }
+
+                                ScrollView {
+                                    VStack(spacing: 8) {
+                                        // Main Bundle Row
+                                        HStack(spacing: 12) {
+                                            Text("EJECUTABLE")
+                                                .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                                                .foregroundStyle(RamanTheme.emeraldSafe)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 3)
+                                                .background(RamanTheme.emeraldSafe.opacity(0.14), in: Capsule())
+                                                .frame(width: 115, alignment: .leading)
+
+                                            Text(app.bundlePath)
+                                                .font(.caption.monospaced())
+                                                .foregroundStyle(.white)
+                                                .lineLimit(1)
+
+                                            Spacer()
+
+                                            Text(ByteFormatter.string(from: app.appSizeBytes))
+                                                .font(.caption.monospacedDigit().bold())
+                                        }
+                                        .padding(12)
+                                        .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 10))
+
+                                        ForEach(app.leftovers) { item in
+                                            HStack(spacing: 12) {
+                                                Text(item.kind.uppercased())
+                                                    .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                                                    .foregroundStyle(RamanTheme.laserCyan)
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 3)
+                                                    .background(RamanTheme.laserCyan.opacity(0.14), in: Capsule())
+                                                    .frame(width: 115, alignment: .leading)
+
+                                                Text(item.path)
+                                                    .font(.caption.monospaced())
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+
+                                                Spacer()
+
+                                                Text(ByteFormatter.string(from: item.sizeBytes))
+                                                    .font(.caption.monospacedDigit().bold())
+                                                    .foregroundStyle(.secondary)
+
+                                                Button {
+                                                    scanner.revealInFinder(path: item.path)
+                                                } label: {
+                                                    Image(systemName: "folder")
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
+                                            .padding(12)
+                                            .background(Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 10))
+                                        }
+                                    }
+                                }
+                            }
                         }
+                        .padding(24)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    } else {
+                        VStack {
+                            Text("Selecciona una aplicación")
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .padding(28)
                 }
             } else {
                 // Orphaned Leftovers Mode
@@ -167,7 +345,7 @@ struct AppUninstallerView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.system(size: 48))
-                                .foregroundStyle(.green)
+                                .foregroundStyle(RamanTheme.emeraldSafe)
                             Text("Sin residuos huérfanos")
                                 .font(.title3.bold())
                             Text("No se encontraron restos de aplicaciones desinstaladas anteriormente.")
@@ -177,7 +355,7 @@ struct AppUninstallerView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         HStack {
-                            Text("Restos de aplicaciones que ya no están en tu carpeta Aplicaciones")
+                            Text("Restos en ~/Library de aplicaciones que ya no existen en /Applications")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -186,10 +364,11 @@ struct AppUninstallerView: View {
                                 Task { await scanner.cleanSelectedOrphans() }
                             } label: {
                                 Text("Limpiar Huérfanos (\(ByteFormatter.string(from: orphanTotal)))")
-                                    .fontWeight(.semibold)
+                                    .fontWeight(.bold)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(.orange)
+                            .tint(RamanTheme.stokesAmber)
+                            .foregroundStyle(.black)
                             .disabled(orphanTotal == 0 || scanner.isExecutingOperation)
                         }
                         .padding(.horizontal, 28)
@@ -200,13 +379,14 @@ struct AppUninstallerView: View {
                                 ForEach(scanner.orphanedLeftovers) { orphan in
                                     HStack(spacing: 12) {
                                         Image(systemName: "folder.badge.minus")
-                                            .foregroundStyle(.orange)
+                                            .foregroundStyle(RamanTheme.stokesAmber)
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(orphan.name)
                                                 .font(.subheadline.weight(.medium))
-                                            Text(orphan.locationType)
-                                                .font(.caption)
+                                            Text("\(orphan.locationType) · \(orphan.path)")
+                                                .font(.caption.monospaced())
                                                 .foregroundStyle(.secondary)
+                                                .lineLimit(1)
                                         }
                                         Spacer()
                                         Text(ByteFormatter.string(from: orphan.sizeBytes))
@@ -220,7 +400,11 @@ struct AppUninstallerView: View {
                                         .buttonStyle(.plain)
                                     }
                                     .padding(14)
-                                    .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+                                    .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(RamanTheme.borderSubtle, lineWidth: 1)
+                                    )
                                 }
                             }
                             .padding(28)
@@ -228,46 +412,6 @@ struct AppUninstallerView: View {
                     }
                 }
             }
-        }
-        .sheet(item: $inspectedApp) { app in
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: app.bundlePath))
-                        .resizable()
-                        .frame(width: 32, height: 32)
-                    VStack(alignment: .leading) {
-                        Text("Archivos asociados de \(app.name)")
-                            .font(.headline)
-                        Text(app.bundleId)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("Cerrar") { inspectedApp = nil }
-                }
-                Divider()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(app.leftovers) { item in
-                            HStack {
-                                Text(item.kind)
-                                    .font(.caption.bold())
-                                    .foregroundStyle(.cyan)
-                                    .frame(width: 120, alignment: .leading)
-                                Text(item.path)
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                Spacer()
-                                Text(ByteFormatter.string(from: item.sizeBytes))
-                                    .font(.caption.monospacedDigit().bold())
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(20)
-            .frame(width: 560, height: 320)
         }
         .alert(
             "Desinstalar \(selectedAppForUninstall?.name ?? "")",
@@ -287,11 +431,7 @@ struct AppUninstallerView: View {
             }
         } message: {
             if let app = selectedAppForUninstall {
-                if app.requiresAdminToTrash {
-                    Text("Se enviará '\(app.name).app' y sus \(app.leftovers.count) residuos (\(ByteFormatter.string(from: app.totalSizeBytes))) al Basurero. macOS solicitará tu contraseña o Touch ID.")
-                } else {
-                    Text("Se enviará '\(app.name).app' y sus \(app.leftovers.count) carpetas asociadas (\(ByteFormatter.string(from: app.totalSizeBytes))) al Basurero.")
-                }
+                Text("Se enviará '\(app.name).app' y sus \(app.leftovers.count) carpetas asociadas (\(ByteFormatter.string(from: app.totalSizeBytes))) al Basurero.")
             }
         }
     }
