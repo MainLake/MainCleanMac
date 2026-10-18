@@ -41,7 +41,7 @@
 ## 🚀 Instalación y Primera Ejecución
 
 ### Descarga del Ejecutable
-1. Descarga la versión más reciente desde [Releases](https://github.com/MainLake/adventurous-raman/releases).
+1. Descarga la versión más reciente desde [Releases](https://github.com/MainLake/MainCleanMac/releases).
 2. Arrastra `MainCleanMac.app` a tu carpeta `/Applications`.
 
 ### ⚠️ Cómo abrir la app por primera vez (Sin cuenta de desarrollador de Apple)
@@ -69,8 +69,8 @@ Requisitos:
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/MainLake/adventurous-raman.git
-cd adventurous-raman
+git clone https://github.com/MainLake/MainCleanMac.git
+cd MainCleanMac
 
 # Ejecutar las pruebas unitarias automatizadas
 swift test
