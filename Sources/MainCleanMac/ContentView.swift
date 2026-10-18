@@ -20,86 +20,90 @@ struct ContentView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    Group {
-                        switch selectedTab {
-                        case .dashboard:
-                            DashboardView(selectedTab: $selectedTab)
-                        case .smartCaches:
-                            SmartCachesView()
-                        case .uninstaller:
-                            AppUninstallerView()
-                        case .appleSilicon:
-                            AppleSiliconOptimizerView()
-                        case .spaceLens:
-                            SpaceLensView()
+                    // Top Content Area (Operation Overlay only covers this area, never the bottom Log Drawer)
+                    ZStack(alignment: .bottomTrailing) {
+                        Group {
+                            switch selectedTab {
+                            case .dashboard:
+                                DashboardView(selectedTab: $selectedTab)
+                            case .smartCaches:
+                                SmartCachesView()
+                            case .uninstaller:
+                                AppUninstallerView()
+                            case .appleSilicon:
+                                AppleSiliconOptimizerView()
+                            case .spaceLens:
+                                SpaceLensView()
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                        // Real-Time Operation Overlay (confined to the main view, leaving the bottom log drawer 100% scrollable & clickable)
+                        if scanner.isExecutingOperation {
+                            ZStack {
+                                Color.black.opacity(0.45)
+
+                                VStack(spacing: 12) {
+                                    ProgressView()
+                                        .scaleEffect(1.15)
+                                        .tint(MainCleanTheme.emeraldSafe)
+
+                                    Text(scanner.currentOperationTitle)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+
+                                    Text(scanner.currentOperationSubtitle)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .frame(maxWidth: 420)
+
+                                    Button {
+                                        withAnimation(.spring(duration: 0.25)) {
+                                            scanner.showLogDrawer.toggle()
+                                        }
+                                    } label: {
+                                        Label(scanner.showLogDrawer ? "Ocultar Registro Inferior" : "Abrir Registro en Tiempo Real", systemImage: "terminal")
+                                            .font(.caption.weight(.medium))
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
+                                .padding(22)
+                                .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 14))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(MainCleanTheme.borderStrong, lineWidth: 1)
+                                )
+                                .shadow(color: .black.opacity(0.45), radius: 20)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .transition(.opacity)
+                        }
+
+                        // Timed Toast Notification (4s auto-dismiss with countdown bar)
+                        if let status = scanner.lastStatusMessage, !scanner.isExecutingOperation {
+                            TimedToastNotificationView(
+                                message: status,
+                                toastId: scanner.toastId,
+                                showLogDrawer: $scanner.showLogDrawer,
+                                onDismiss: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        scanner.lastStatusMessage = nil
+                                    }
+                                }
+                            )
+                            .padding(.trailing, 24)
+                            .padding(.bottom, 18)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+                    // Bottom Log Drawer: Completely outside the operation overlay so you can always scroll, click, and inspect logs in real time
                     if scanner.showLogDrawer {
                         ActivityLogDrawerView()
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
-                }
-
-                // Timed Toast Notification (4s auto-dismiss with countdown bar)
-                if let status = scanner.lastStatusMessage, !scanner.isExecutingOperation {
-                    TimedToastNotificationView(
-                        message: status,
-                        toastId: scanner.toastId,
-                        showLogDrawer: $scanner.showLogDrawer,
-                        onDismiss: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                scanner.lastStatusMessage = nil
-                            }
-                        }
-                    )
-                    .padding(.trailing, 24)
-                    .padding(.bottom, scanner.showLogDrawer ? 196 : 20)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-
-                // Real-Time Operation Overlay
-                if scanner.isExecutingOperation {
-                    ZStack {
-                        Color.black.opacity(0.48)
-                            .ignoresSafeArea()
-
-                        VStack(spacing: 14) {
-                            ProgressView()
-                                .scaleEffect(1.2)
-                                .tint(MainCleanTheme.emeraldSafe)
-
-                            Text(scanner.currentOperationTitle)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
-
-                            Text(scanner.currentOperationSubtitle)
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .frame(maxWidth: 400)
-
-                            Button {
-                                withAnimation(.spring(duration: 0.25)) {
-                                    scanner.showLogDrawer.toggle()
-                                }
-                            } label: {
-                                Label(scanner.showLogDrawer ? "Ocultar Registro" : "Ver Registro en Tiempo Real", systemImage: "terminal")
-                                    .font(.caption.weight(.medium))
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                        .padding(24)
-                        .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(MainCleanTheme.borderStrong, lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.45), radius: 20)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.opacity)
                 }
             }
         }
@@ -818,26 +822,81 @@ struct ModuleSummaryCard: View {
     }
 }
 
-// MARK: - Activity Log Drawer
+// MARK: - Activity Log Drawer (100% Interactive & Auto-Scrolling in Real Time)
 
 struct ActivityLogDrawerView: View {
     @EnvironmentObject var scanner: SystemScannerService
+    @State private var autoFollowLatest: Bool = true
+    @State private var isExpandedHeight: Bool = false
+
+    // Chronological order (oldest at top, newest at bottom) so terminal streaming feels natural
+    var chronologicalLogs: [ActivityLogEntry] {
+        scanner.activityLogs.reversed()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Image(systemName: "terminal")
-                    .foregroundStyle(MainCleanTheme.accentBlue)
-                Text("REGISTRO DE ACTIVIDAD EN TIEMPO REAL (\(scanner.activityLogs.count))")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            // Drawer Header Bar
+            HStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(scanner.isExecutingOperation ? MainCleanTheme.emeraldSafe : MainCleanTheme.accentBlue)
+                        .frame(width: 7, height: 7)
+                    Image(systemName: "terminal")
+                        .font(.caption)
+                        .foregroundStyle(MainCleanTheme.accentBlue)
+                    Text("REGISTRO DE ACTIVIDAD EN TIEMPO REAL (\(scanner.activityLogs.count))")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white)
+                }
+
+                if scanner.isExecutingOperation {
+                    Text("· EJECUTANDO EN VIVO")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(MainCleanTheme.emeraldSafe)
+                }
+
                 Spacer()
+
+                // Auto-Follow Toggle Button
+                Button {
+                    autoFollowLatest.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: autoFollowLatest ? "arrow.down.to.line.compact" : "hand.raised.fill")
+                            .font(.system(size: 9, weight: .bold))
+                        Text(autoFollowLatest ? "Auto-Scroll Activo" : "Scroll Libre")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundStyle(autoFollowLatest ? MainCleanTheme.emeraldSafe : .secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.06), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("Activa o pausa el seguimiento automático cuando haces scroll manual")
+
+                // Expand / Compact Drawer Height
+                Button {
+                    withAnimation(.spring(duration: 0.2)) {
+                        isExpandedHeight.toggle()
+                    }
+                } label: {
+                    Image(systemName: isExpandedHeight ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
+                .help(isExpandedHeight ? "Reducir altura del registro" : "Ampliar altura del registro")
+
                 Button("Limpiar") {
                     scanner.clearLogs()
                 }
                 .font(.caption2)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .padding(.trailing, 8)
+                .padding(.horizontal, 4)
 
                 Button {
                     withAnimation(.spring(duration: 0.25)) {
@@ -851,11 +910,11 @@ struct ActivityLogDrawerView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color.black.opacity(0.35))
+            .background(Color.black.opacity(0.4))
 
             Divider().overlay(MainCleanTheme.borderSubtle)
 
-            if scanner.activityLogs.isEmpty {
+            if chronologicalLogs.isEmpty {
                 HStack {
                     Spacer()
                     Text("Sin eventos registrados en esta sesión.")
@@ -863,39 +922,55 @@ struct ActivityLogDrawerView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
-                .frame(height: 145)
+                .frame(height: isExpandedHeight ? 260 : 160)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(scanner.activityLogs) { entry in
-                            HStack(alignment: .top, spacing: 8) {
-                                Text(entry.timeString)
-                                    .font(.caption2.monospaced())
-                                    .foregroundStyle(.secondary)
-
-                                Image(systemName: entry.level.icon)
-                                    .font(.caption2)
-                                    .foregroundStyle(entry.level.color)
-
-                                Text(entry.message)
-                                    .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.9))
-
-                                if let detail = entry.detail, !detail.isEmpty {
-                                    Text("· \(detail)")
-                                        .font(.caption2.monospaced())
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 5) {
+                            ForEach(chronologicalLogs) { entry in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text(entry.timeString)
+                                        .font(.system(size: 10.5, design: .monospaced))
                                         .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+
+                                    Image(systemName: entry.level.icon)
+                                        .font(.system(size: 10.5))
+                                        .foregroundStyle(entry.level.color)
+
+                                    Text(entry.message)
+                                        .font(.system(size: 11.5, weight: .medium))
+                                        .foregroundStyle(.white.opacity(0.92))
+                                        .textSelection(.enabled)
+
+                                    if let detail = entry.detail, !detail.isEmpty {
+                                        Text("· \(detail)")
+                                            .font(.system(size: 10.5, design: .monospaced))
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                            .textSelection(.enabled)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 2)
+                                .id(entry.id)
                             }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 2)
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .frame(height: isExpandedHeight ? 260 : 160)
+                    .onAppear {
+                        if let lastId = chronologicalLogs.last?.id {
+                            proxy.scrollTo(lastId, anchor: .bottom)
                         }
                     }
-                    .padding(.vertical, 6)
+                    .onChange(of: scanner.activityLogs.first?.id) { _, _ in
+                        guard autoFollowLatest, let lastId = chronologicalLogs.last?.id else { return }
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            proxy.scrollTo(lastId, anchor: .bottom)
+                        }
+                    }
                 }
-                .frame(height: 145)
             }
         }
         .background(MainCleanTheme.panelBg)
