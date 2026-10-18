@@ -5,80 +5,63 @@
 [![Swift](https://img.shields.io/badge/Swift-5.9%2B-F05138?style=flat-square&logo=swift)](https://swift.org)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
-**MainCleanMac** es una aplicación nativa para macOS en **Swift / SwiftUI** diseñada específicamente para procesadores **Apple Silicon**. Combina la facilidad de uso para cualquier persona con herramientas avanzadas para desarrolladores y usuarios pro, permitiendo recuperar gigabytes de almacenamiento sin romper configuraciones ni cerrar sesiones.
+**MainCleanMac** es una utilidad nativa de código abierto en **Swift y SwiftUI** diseñada específicamente para Mac con arquitectura **Apple Silicon**. Proporciona un sistema moderno de limpieza de almacenamiento, inspección profunda de datos del sistema y mantenimiento sin pérdida de datos.
 
 ---
 
-## ⚡ Características Principales
+## ⚡ Características
 
-### 1. Experiencia de Doble Modo (`Modo Simple` vs. `Modo Avanzado (Pro)`)
-- **Modo Simple (Predeterminado):** Diseñado para que cualquier usuario pueda optimizar su Mac con tranquilidad. Lenguaje claro, sin términos técnicos confusos y con dos acciones principales:
-  - **Limpieza Rápida:** Elimina cachés de navegación, archivos temporales e instaladores antiguos de apps en un solo clic.
-  - **Limpieza Profunda:** Recupera gigabytes atrapados en "Datos del Sistema", instaladores estancados y restos de programas ya eliminados.
-- **Modo Avanzado (Pro):** Revela rutas exactas en formato POSIX (`~/Library/...`), identificadores de paquete (`bundleId`), telemetría de hardware en tiempo real (Swap, RAM Unificada, Instantáneas APFS) y controles granulares.
-
-### 2. Desinstalador Completo de Aplicaciones
-- Elimina cualquier aplicación junto con todos sus residuos ocultos en `~/Library` (`Application Support`, `Caches`, `Containers`, `Preferences`, `Saved Application State`).
-- **Detección de Huérfanos:** Encuentra y elimina carpetas residuales de aplicaciones que borraste en el pasado.
-- Desinstalación sin fricción mediante permisos de administración de aplicaciones (`TCC`).
-
-### 3. Rayos X: Datos del Sistema y Explorador de Disco
-- **¿Qué hay dentro de "Datos del Sistema"?:** Desglosa la "caja negra" del almacenamiento de macOS (juegos, contenedores, cachés de multimedia de Apple, instaladores como `com.docker.install` o `GoogleUpdater`).
-- **Navegador por Tamaño:** Explora carpetas ordenadas de mayor a menor tamaño y envía al Basurero lo que no necesites.
-- **Escudo de Seguridad Activo (`SafetyGuard`):** Protege automáticamente rutas críticas del sistema (`/System`, `/bin`, `/usr`) y del usuario (`~/.ssh`, `~/.gnupg`, Llaveros de contraseñas, Fototeca).
-
-### 4. Optimizador Apple Silicon y Entorno Dev
-- **Adelgazamiento de Binarios Mach-O:** Identifica aplicaciones con código duplicado para Intel (`x86_64`) y permite extraer la arquitectura nativa `arm64` (`lipo -thin arm64`).
-- **Compactación SQLite sin Pérdida (`VACUUM`):** Desfragmenta bases de datos locales (Chrome, Safari, etc.) liberando páginas vacías sin tocar tus datos.
-- **Limpieza de Proyectos:** Localiza carpetas pesadas como `node_modules`, `.venv`, `.next` y `target`.
-- **Docker Manager:** Inspecciona y purga contenedores, volúmenes, imágenes y build cache.
-
-### 5. Mantenimiento Automático en Segundo Plano
-- Configura un agente nativo de macOS (`launchd`) para mantener tu equipo limpio de manera automática con la frecuencia que elijas.
+- **Modo Dual Adaptativo:**
+  - **Modo Simple:** Interfaz intuitiva para cualquier usuario. Limpieza rápida en 1 clic de archivos temporales y recuperación de espacio sin configuraciones complejas.
+  - **Modo Avanzado (Pro):** Control granular para desarrolladores y usuarios avanzados, con rutas POSIX completas, bundle IDs, telemetría de memoria unificada (Swap, RAM, instantáneas APFS) e inspección detallada.
+- **Desinstalador Completo:**
+  - Desinstalación limpia de aplicaciones y eliminación de carpetas residuales asociadas (`Application Support`, `Caches`, `Containers`, `Preferences`, `Saved Application State`).
+  - Detección y eliminación de residuos de aplicaciones desinstaladas previamente (archivos huérfanos).
+- **Inspección de "Datos del Sistema":**
+  - Desglose y análisis detallado de directorios pesados clasificados dentro de Datos del Sistema en macOS.
+  - Limpieza de instaladores estancados, cachés internas de navegadores y paquetes antiguos.
+- **Optimizador Apple Silicon y Herramientas Dev:**
+  - Detección de binarios universales con código redundante Intel x86_64 y soporte para adelgazamiento a `arm64`.
+  - Compactación de bases de datos SQLite locales (`VACUUM`) sin pérdida de información ni cierre de sesiones.
+  - Limpieza de artefactos de desarrollo (`node_modules`, `.venv`, `.next`, `target`).
+  - Gestión y purga de Docker (contenedores, volúmenes, imágenes y build cache).
+- **Escudo de Protección (`SafetyGuard`):**
+  - Protección activa para prevenir la eliminación accidental de rutas críticas del sistema (`/System`, `/usr`, `/bin`) y archivos personales sensibles (`.ssh`, `.gnupg`, llaveros de contraseñas, bibliotecas).
+- **Mantenimiento Programado:**
+  - Soporte para automatización en segundo plano mediante un agente nativo de macOS (`launchd`).
 
 ---
 
-## 🚀 Instalación y Primera Ejecución
+## 🚀 Instalación
 
-### Descarga del Ejecutable
+### Descarga directa
 1. Descarga la versión más reciente desde [Releases](https://github.com/MainLake/MainCleanMac/releases).
-2. Arrastra `MainCleanMac.app` a tu carpeta `/Applications`.
-
-### ⚠️ Cómo abrir la app por primera vez (Sin cuenta de desarrollador de Apple)
-Al no pagar la suscripción de $99 USD anuales de Apple, macOS Gatekeeper mostrará una advertencia al abrirla por primera vez:
-
-> *"«MainCleanMac» no se puede abrir porque Apple no puede comprobar si contiene software malicioso."*
-
-**Para autorizarla en 3 segundos (solo se hace una vez):**
-1. Haz **clic derecho** (o `Control` + Clic) sobre `MainCleanMac.app`.
-2. Selecciona **Abrir**.
-3. En la ventana de confirmación, presiona el botón **Abrir**.
-
-*(A partir de ese momento se abrirá con doble clic normal como cualquier otra app).*
-
-> **Alternativa desde Ajustes:** Ve a **Ajustes del Sistema** > **Privacidad y seguridad** y presiona **"Abrir de todos modos"**.
+2. Abre el archivo descargado y mueve `MainCleanMac.app` a tu carpeta `/Applications`.
+3. Para abrir la aplicación por primera vez:
+   - Haz **clic derecho** (o `Control` + clic) sobre `MainCleanMac.app` y selecciona **Abrir**.
+   - Confirma la apertura en el mensaje de seguridad de macOS.
 
 ---
 
-## 🛠️ Compilación desde el Código Fuente
+## 🛠️ Compilación desde el código fuente
 
-Requisitos:
+### Requisitos previos
 - macOS 14.0 (Sonoma) o superior.
-- Mac con procesador Apple Silicon (M1, M2, M3, M4).
-- Swift 5.9+.
+- Mac con procesador Apple Silicon (M1, M2, M3 o M4).
+- Xcode 15+ o Swift Toolchain 5.9+.
 
 ```bash
 # Clonar el repositorio
 git clone https://github.com/MainLake/MainCleanMac.git
 cd MainCleanMac
 
-# Ejecutar las pruebas unitarias automatizadas
+# Ejecutar las pruebas unitarias
 swift test
 
-# Compilar y empaquetar la app
+# Compilar e instalar en /Applications
 ./build_app.sh
 
-# Abrir la app
+# Ejecutar la aplicación
 open MainCleanMac.app
 ```
 
@@ -86,27 +69,14 @@ open MainCleanMac.app
 
 ## 🧪 Pruebas Automatizadas
 
-El proyecto cuenta con una suite de pruebas unitarias que validan:
-- Blindaje de seguridad en rutas protegidas (`SafetyGuard`).
-- Lógica de cálculo de almacenamiento APFS y formateo de bytes.
-- Consistencia en el cambio de Modo Simple y Modo Avanzado.
-- Gestión del registro de actividad en tiempo real.
+El proyecto incluye una suite de pruebas para verificar la integridad del escaneo, cálculos de disco, clasificación de seguridad y lógica de negocio:
 
-Para ejecutarlas:
 ```bash
 swift test
 ```
 
 ---
 
-## 🏷️ Etiquetas / Topics para GitHub
-
-Para mejorar la visibilidad del repositorio en las búsquedas de GitHub, añade estas etiquetas en la sección **About / Topics** de tu repositorio:
-
-`macos` · `apple-silicon` · `swift` · `swiftui` · `cleaner` · `mac-cleaner` · `storage-cleaner` · `m1` · `m2` · `m3` · `m4` · `disk-cleanup` · `system-data` · `app-uninstaller` · `open-source` · `macos-utility` · `mac-utility` · `dev-tools` · `docker-cleaner` · `optimizer`
-
----
-
 ## 📄 Licencia
 
-Distribuido bajo la Licencia MIT. Consulta `LICENSE` para más información.
+Este proyecto está bajo la Licencia MIT. Consulta el archivo [LICENSE](LICENSE) para más detalles.
