@@ -29,6 +29,7 @@ final class SystemScannerService: ObservableObject {
 
     @Published var recommendations: [SmartRecommendation] = []
     @Published var safeModeTrashOnly: Bool = true
+    @Published var isAdvancedMode: Bool = false
 
     // Uninstaller & Orphans
     @Published var installedApps: [InstalledAppInfo] = []
@@ -1463,6 +1464,37 @@ final class SystemScannerService: ObservableObject {
                         title: "Google Chrome → \(chromeSub)",
                         context: "Caché interna de perfil de Chrome en Application Support",
                         preserved: "100% seguro: Tus contraseñas, pestañas, historial, cookies y sesiones de Google Chrome NO se tocan.",
+                        path: p,
+                        category: .appSupportSurgery,
+                        safety: .safe,
+                        selectedByDefault: true
+                    ))
+                }
+            }
+
+            // GoogleUpdater (814+ MB of old Chrome update packages in Application Support/Google/GoogleUpdater)
+            let googleUpdaterPath = "\(appSupportDir)/Google/GoogleUpdater"
+            if fm.fileExists(atPath: googleUpdaterPath) {
+                rawCandidates.append((
+                    title: "Actualizaciones Antiguas de Google (GoogleUpdater)",
+                    context: "Instaladores viejos de Chrome en Application Support/Google/GoogleUpdater",
+                    preserved: "100% seguro: Google Chrome sigue funcionando normal con todas tus cuentas y sesiones.",
+                    path: googleUpdaterPath,
+                    category: .appSupportSurgery,
+                    safety: .safe,
+                    selectedByDefault: true
+                ))
+            }
+
+            // Chrome top-level model & shader caches inside Application Support/Google/Chrome
+            let chromeRoot = "\(appSupportDir)/Google/Chrome"
+            for chromeTopSub in ["OptGuideOnDeviceModel", "OptimizationGuidePredictionModels", "ComponentCRXCache", "ShaderCache", "GrShaderCache", "GraphiteDawnCache", "BrowserMetrics"] {
+                let p = "\(chromeRoot)/\(chromeTopSub)"
+                if fm.fileExists(atPath: p) {
+                    rawCandidates.append((
+                        title: "Google Chrome → \(chromeTopSub)",
+                        context: "Modelos y cachés descargadas por Chrome en Application Support",
+                        preserved: "100% seguro: Tus contraseñas, pestañas, marcadores y sesiones de Chrome quedan intactas.",
                         path: p,
                         category: .appSupportSurgery,
                         safety: .safe,

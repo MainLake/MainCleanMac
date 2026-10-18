@@ -2,31 +2,41 @@ import Foundation
 import SwiftUI
 
 enum NavigationTab: String, CaseIterable, Identifiable {
-    case dashboard = "Resumen General"
+    case dashboard = "Inicio"
     case smartCaches = "Cachés y Datos"
-    case uninstaller = "Desinstalador"
+    case uninstaller = "Mis Aplicaciones"
+    case spaceLens = "Explorar mi Disco"
     case appleSilicon = "Desarrollo y Chip M"
-    case spaceLens = "Explorador de Disco"
 
     var id: String { rawValue }
 
+    func displayTitle(isAdvanced: Bool) -> String {
+        switch self {
+        case .dashboard: return isAdvanced ? "Resumen General" : "Inicio"
+        case .smartCaches: return isAdvanced ? "Cachés y Paquetes" : "Archivos Temporales"
+        case .uninstaller: return isAdvanced ? "Desinstalador Completo" : "Mis Aplicaciones"
+        case .spaceLens: return isAdvanced ? "Explorador y Datos del Sistema" : "Explorar mi Disco"
+        case .appleSilicon: return "Desarrollo y Chip M"
+        }
+    }
+
     var tagline: String {
         switch self {
-        case .dashboard: return "Estado y acciones rápidas"
+        case .dashboard: return "Liberar espacio en 1 clic"
         case .smartCaches: return "Limpiar basura sin perder sesiones"
-        case .uninstaller: return "Apps y restos de desinstalaciones"
-        case .appleSilicon: return "Proyectos, Node, Docker y Hardware"
-        case .spaceLens: return "Navegar carpetas por tamaño"
+        case .uninstaller: return "Desinstalar programas y sus restos"
+        case .spaceLens: return "Ver qué ocupa más espacio"
+        case .appleSilicon: return "Proyectos, Docker, SQLite y Chip M"
         }
     }
 
     var icon: String {
         switch self {
-        case .dashboard: return "square.grid.2x2.fill"
-        case .smartCaches: return "cylinder.split.1x2.fill"
-        case .uninstaller: return "macwindow.badge.plus"
+        case .dashboard: return "house.fill"
+        case .smartCaches: return "sparkles.rectangle.stack.fill"
+        case .uninstaller: return "square.grid.2x2.fill"
+        case .spaceLens: return "magnifyingglass.circle.fill"
         case .appleSilicon: return "terminal.fill"
-        case .spaceLens: return "folder.fill.badge.gearshape"
         }
     }
 
@@ -35,8 +45,8 @@ enum NavigationTab: String, CaseIterable, Identifiable {
         case .dashboard: return MainCleanTheme.brandBlue
         case .smartCaches: return MainCleanTheme.safeGreen
         case .uninstaller: return MainCleanTheme.deepAmber
+        case .spaceLens: return MainCleanTheme.accentIndigo
         case .appleSilicon: return MainCleanTheme.brandBlue
-        case .spaceLens: return MainCleanTheme.safeGreen
         }
     }
 }

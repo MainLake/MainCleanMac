@@ -29,47 +29,55 @@ struct AppUninstallerView: View {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Desinstalador")
+                        Text(scanner.isAdvancedMode ? "Desinstalador Completo" : "Mis Aplicaciones")
                             .font(.system(size: 24, weight: .bold))
-                        Text("APPS Y RESTOS DE DESINSTALACIÓN")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(MainCleanTheme.crimsonDanger)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(MainCleanTheme.crimsonDanger.opacity(0.14), in: Capsule())
+                        if scanner.isAdvancedMode {
+                            Text("APPS Y RESTOS DE DESINSTALACIÓN")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(MainCleanTheme.crimsonDanger)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(MainCleanTheme.crimsonDanger.opacity(0.14), in: Capsule())
+                        }
                     }
-                    Text("Desinstala aplicaciones junto con sus carpetas ocultas o elimina restos de programas que ya borraste antes.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        scanner.isAdvancedMode
+                            ? "Desinstala aplicaciones junto con sus carpetas ocultas o elimina restos de programas que ya borraste antes."
+                            : "Al borrar una app normalmente quedan archivos ocultos en tu Mac. Aquí puedes borrarla por completo sin dejar rastro."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
                 Picker("", selection: $mode) {
-                    Text("Apps Instaladas (\(scanner.installedApps.count))").tag(0)
-                    Text("Restos Huérfanos (\(scanner.orphanedLeftovers.count))").tag(1)
+                    Text("Programas Instalados (\(scanner.installedApps.count))").tag(0)
+                    Text("Restos de Apps Borradas (\(scanner.orphanedLeftovers.count))").tag(1)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 300)
+                .frame(width: 340)
 
-                Menu {
-                    Button {
-                        scanner.openAppManagementSettings()
+                if scanner.isAdvancedMode {
+                    Menu {
+                        Button {
+                            scanner.openAppManagementSettings()
+                        } label: {
+                            Label("Abrir 'Administración de aplicaciones'", systemImage: "app.badge.checkmark")
+                        }
+                        Button {
+                            scanner.openFullDiskAccessSettings()
+                        } label: {
+                            Label("Abrir 'Acceso total al disco'", systemImage: "externaldrive.badge.checkmark")
+                        }
                     } label: {
-                        Label("Abrir 'Administración de aplicaciones'", systemImage: "app.badge.checkmark")
+                        Label("Permisos TCC", systemImage: "lock.open.fill")
+                            .font(.caption.weight(.semibold))
                     }
-                    Button {
-                        scanner.openFullDiskAccessSettings()
-                    } label: {
-                        Label("Abrir 'Acceso total al disco'", systemImage: "externaldrive.badge.checkmark")
-                    }
-                } label: {
-                    Label("Permisos TCC", systemImage: "lock.open.fill")
-                        .font(.caption.weight(.semibold))
+                    .menuStyle(.borderedButton)
+                    .fixedSize()
+                    .help("Activa Administración de aplicaciones y Acceso total al disco para borrar apps de App Store sin pedir contraseña.")
                 }
-                .menuStyle(.borderedButton)
-                .fixedSize()
-                .help("Activa Administración de aplicaciones y Acceso total al disco (como Pearcleaner) para borrar apps de App Store sin pedir contraseña.")
 
                 Button {
                     Task { await scanner.scanInstalledApps() }
@@ -92,7 +100,7 @@ struct AppUninstallerView: View {
                     ProgressView()
                         .scaleEffect(1.15)
                         .tint(RamanTheme.laserCyan)
-                    Text("Rastreando aplicaciones en /Applications y sus residuos en ~/Library...")
+                    Text("Buscando aplicaciones instaladas y sus archivos asociados...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -106,7 +114,7 @@ struct AppUninstallerView: View {
                             Image(systemName: "magnifyingglass")
                                 .foregroundStyle(.secondary)
                                 .font(.caption)
-                            TextField("Filtrar aplicación...", text: $searchText)
+                            TextField("Buscar aplicación...", text: $searchText)
                                 .textFieldStyle(.plain)
                                 .font(.subheadline)
                             if !searchText.isEmpty {
@@ -147,7 +155,7 @@ struct AppUninstallerView: View {
                                                     .foregroundStyle(.white)
                                                     .lineLimit(1)
 
-                                                Text("\(app.leftovers.count) residuos · \(ByteFormatter.string(from: app.leftoversSizeBytes))")
+                                                Text("\(app.leftovers.count) archivos extra · \(ByteFormatter.string(from: app.leftoversSizeBytes))")
                                                     .font(.caption2)
                                                     .foregroundStyle(app.leftovers.isEmpty ? .secondary : RamanTheme.laserCyan)
                                             }
@@ -198,7 +206,7 @@ struct AppUninstallerView: View {
                                             .font(.system(size: 22, weight: .bold, design: .rounded))
                                         if app.isSystemOrProtected {
                                             SafetyBadgeView(level: .protected)
-                                        } else if app.requiresAdminToTrash {
+                                        } else if app.requiresAdminToTrash && scanner.isAdvancedMode {
                                             Text("App Store / Root")
                                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                                                 .foregroundStyle(RamanTheme.stokesAmber)
@@ -208,15 +216,17 @@ struct AppUninstallerView: View {
                                         }
                                     }
 
-                                    Text(app.bundleId)
-                                        .font(.caption.monospaced())
-                                        .foregroundStyle(.secondary)
+                                    if scanner.isAdvancedMode {
+                                        Text(app.bundleId)
+                                            .font(.caption.monospaced())
+                                            .foregroundStyle(.secondary)
+                                    }
 
                                     HStack(spacing: 16) {
-                                        Label("Paquete .app: \(ByteFormatter.string(from: app.appSizeBytes))", systemImage: "app.fill")
+                                        Label("Programa: \(ByteFormatter.string(from: app.appSizeBytes))", systemImage: "app.fill")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
-                                        Label("Residuos en ~/Library: \(ByteFormatter.string(from: app.leftoversSizeBytes))", systemImage: "folder.fill.badge.gearshape")
+                                        Label("Datos ocultos: \(ByteFormatter.string(from: app.leftoversSizeBytes))", systemImage: "folder.fill.badge.gearshape")
                                             .font(.caption)
                                             .foregroundStyle(RamanTheme.laserCyan)
                                     }
@@ -257,11 +267,15 @@ struct AppUninstallerView: View {
                             // Associated Files & Leftovers List
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack {
-                                    Text("MAPA DE ARCHIVOS QUE SE ELIMINARÁN (\(app.leftovers.count + 1) RUTAS)")
-                                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                                        .foregroundStyle(.secondary)
+                                    Text(
+                                        scanner.isAdvancedMode
+                                            ? "MAPA DE ARCHIVOS QUE SE ELIMINARÁN (\(app.leftovers.count + 1) RUTAS)"
+                                            : "ARCHIVOS QUE SE ENVIARÁN AL BASURERO (\(app.leftovers.count + 1))"
+                                    )
+                                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                    .foregroundStyle(.secondary)
                                     Spacer()
-                                    Button("Ver .app en Finder") {
+                                    Button("Ver en Finder") {
                                         scanner.revealInFinder(path: app.bundlePath)
                                     }
                                     .font(.caption)

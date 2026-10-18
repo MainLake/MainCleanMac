@@ -43,21 +43,25 @@ struct SpaceLensView: View {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Explorador de Disco")
+                        Text(scanner.isAdvancedMode ? "Explorador y Datos del Sistema" : "Explorar mi Disco")
                             .font(.system(size: 24, weight: .bold))
-                        Text("DATOS DEL SISTEMA Y CARPETAS")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(MainCleanTheme.accentIndigo)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(MainCleanTheme.accentIndigo.opacity(0.16), in: Capsule())
+                        if scanner.isAdvancedMode {
+                            Text("DATOS DEL SISTEMA Y CARPETAS")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(MainCleanTheme.accentIndigo)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(MainCleanTheme.accentIndigo.opacity(0.16), in: Capsule())
+                        }
                     }
                     Text(
                         selectedMode == 0
-                            ? "Limpia subcarpetas pesadas dentro de Application Support, apps fantasmas y carpetas ocultas sin perder tus sesiones."
+                            ? (scanner.isAdvancedMode
+                                ? "Limpia subcarpetas pesadas dentro de Application Support, apps fantasmas y carpetas ocultas sin perder tus sesiones."
+                                : "Archivos pesados que tus aplicaciones acumulan por dentro. Puedes limpiarlos sin perder tus cuentas ni sesiones.")
                             : (selectedMode == 1
-                                ? "Desglose exacto de qué está ocupando espacio dentro de 'Datos del Sistema' en tu Mac."
-                                : "Navegador de carpetas por tamaño: entra en cualquier ruta para inspeccionar y enviar al Basurero lo que no uses.")
+                                ? "Descubre exactamente qué está ocupando espacio dentro de la sección 'Datos del Sistema' de tu Mac."
+                                : "Navega por tus carpetas ordenadas de mayor a menor tamaño y envía al Basurero lo que ya no necesites.")
                     )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -66,12 +70,12 @@ struct SpaceLensView: View {
                 Spacer()
 
                 Picker("", selection: $selectedMode) {
-                    Text("Limpieza Interna (\(scanner.surgicalItems.count))").tag(0)
-                    Text("Datos del Sistema").tag(1)
-                    Text("Navegar Carpetas").tag(2)
+                    Text(scanner.isAdvancedMode ? "Cirugía Interna (\(scanner.surgicalItems.count))" : "Basura en tus Apps (\(scanner.surgicalItems.count))").tag(0)
+                    Text(scanner.isAdvancedMode ? "Rayos X: Sistema" : "Datos del Sistema").tag(1)
+                    Text("Mis Carpetas").tag(2)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 450)
+                .frame(width: 460)
 
                 Button {
                     Task {
@@ -344,10 +348,12 @@ struct SpaceLensView: View {
                                                             .font(.caption)
                                                             .foregroundStyle(RamanTheme.emeraldSafe.opacity(0.9))
                                                     }
-                                                    Text(item.path)
-                                                        .font(.system(size: 10, design: .monospaced))
-                                                        .foregroundStyle(.secondary.opacity(0.7))
-                                                        .lineLimit(1)
+                                                    if scanner.isAdvancedMode {
+                                                        Text(item.path)
+                                                            .font(.system(size: 10, design: .monospaced))
+                                                            .foregroundStyle(.secondary.opacity(0.7))
+                                                            .lineLimit(1)
+                                                    }
                                                 }
                                                 Spacer()
                                             }
@@ -378,7 +384,7 @@ struct SpaceLensView: View {
                                                 Task { await scanner.cleanSurgicalItem(item) }
                                             }
                                         } label: {
-                                            Text("Purgar")
+                                            Text(scanner.isAdvancedMode ? "Purgar" : "Limpiar")
                                                 .font(.caption.weight(.bold))
                                                 .padding(.horizontal, 10)
                                                 .padding(.vertical, 5)
@@ -416,7 +422,7 @@ struct SpaceLensView: View {
                     ProgressView()
                         .scaleEffect(1.2)
                         .tint(RamanTheme.laserCyan)
-                    Text("Radiografiando los 'Datos del Sistema' ocultos de macOS...")
+                    Text("Analizando qué ocupa espacio dentro de 'Datos del Sistema'...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -428,9 +434,9 @@ struct SpaceLensView: View {
                             RamanPrismLogo(size: 52)
 
                             VStack(alignment: .leading, spacing: 5) {
-                                Text("Radiografía Accionable de 'Datos del Sistema'")
+                                Text(scanner.isAdvancedMode ? "Radiografía Accionable de 'Datos del Sistema'" : "¿Qué hay dentro de 'Datos del Sistema'?")
                                     .font(.headline)
-                                Text("Ninguna fila es un callejón sin salida: puedes liberar directamente los cachés/instaladores o hacer clic en 'Inspeccionar Interior' para entrar a cualquier carpeta protegida y borrar subcarpetas específicas.")
+                                Text("Puedes liberar directamente los elementos seguros o hacer clic en 'Abrir Interior' para ver qué subcarpetas ocupan más espacio y borrarlas.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -478,10 +484,12 @@ struct SpaceLensView: View {
                                     Text(item.explanation)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
-                                    Text(item.path)
-                                        .font(.caption2.monospaced())
-                                        .foregroundStyle(.secondary.opacity(0.7))
-                                        .lineLimit(1)
+                                    if scanner.isAdvancedMode {
+                                        Text(item.path)
+                                            .font(.caption2.monospaced())
+                                            .foregroundStyle(.secondary.opacity(0.7))
+                                            .lineLimit(1)
+                                    }
                                 }
 
                                 Spacer()

@@ -26,18 +26,24 @@ struct SmartCachesView: View {
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Cachés y Datos")
+                        Text(scanner.isAdvancedMode ? "Cachés y Paquetes" : "Archivos Temporales")
                             .font(.system(size: 24, weight: .bold))
-                        Text("TEMPORALES Y PAQUETES")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(MainCleanTheme.accentBlue)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(MainCleanTheme.accentBlue.opacity(0.14), in: Capsule())
+                        if scanner.isAdvancedMode {
+                            Text("TEMPORALES Y PAQUETES")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(MainCleanTheme.accentBlue)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(MainCleanTheme.accentBlue.opacity(0.14), in: Capsule())
+                        }
                     }
-                    Text("Elimina cachés regenerables de navegadores, gestores de paquetes y registros sin cerrar tus sesiones.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        scanner.isAdvancedMode
+                            ? "Elimina cachés regenerables de navegadores, gestores de paquetes y registros sin cerrar tus sesiones."
+                            : "Archivos temporales que tus programas guardan mientras los usas. Puedes borrarlos con total tranquilidad."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
@@ -194,7 +200,7 @@ struct SmartCachesView: View {
                                     .font(.system(size: 11, weight: .heavy, design: .monospaced))
                                     .foregroundStyle(selectedCategory.color)
                                 Spacer()
-                                Text("\(activeItems.count) objetivos detectados")
+                                Text("\(activeItems.count) elementos")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -252,10 +258,12 @@ struct CleanableRowView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                        Text(item.path)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary.opacity(0.65))
-                            .lineLimit(1)
+                        if scanner.isAdvancedMode {
+                            Text(item.path)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary.opacity(0.65))
+                                .lineLimit(1)
+                        }
                     }
                     Spacer()
                 }
