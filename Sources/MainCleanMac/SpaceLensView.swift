@@ -43,21 +43,21 @@ struct SpaceLensView: View {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Espectro Disco")
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                        Text("CIRUGÍA PROFUNDA & RAYOS X")
-                            .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(RamanTheme.antiStokesViolet)
+                        Text("Explorador de Disco")
+                            .font(.system(size: 24, weight: .bold))
+                        Text("DATOS DEL SISTEMA Y CARPETAS")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(MainCleanTheme.accentIndigo)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(RamanTheme.antiStokesViolet.opacity(0.16), in: Capsule())
+                            .background(MainCleanTheme.accentIndigo.opacity(0.16), in: Capsule())
                     }
                     Text(
                         selectedMode == 0
-                            ? "Extrae gigabytes ocultos dentro de Application Support, apps fantasmas y versiones antiguas sin perder tus sesiones."
+                            ? "Limpia subcarpetas pesadas dentro de Application Support, apps fantasmas y carpetas ocultas sin perder tus sesiones."
                             : (selectedMode == 1
-                                ? "Radiografía exacta de los 110+ GB de 'Datos del Sistema' con acciones directas o salto a subcarpetas."
-                                : "Navegador de carpetas desbloqueado: entra en Application Support o Containers para borrar lo que no uses.")
+                                ? "Desglose exacto de qué está ocupando espacio dentro de 'Datos del Sistema' en tu Mac."
+                                : "Navegador de carpetas por tamaño: entra en cualquier ruta para inspeccionar y enviar al Basurero lo que no uses.")
                     )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -66,12 +66,12 @@ struct SpaceLensView: View {
                 Spacer()
 
                 Picker("", selection: $selectedMode) {
-                    Text("Cirugía Profunda (\(scanner.surgicalItems.count))").tag(0)
-                    Text("Rayos X Sistema").tag(1)
-                    Text("Mapa de Carpetas").tag(2)
+                    Text("Limpieza Interna (\(scanner.surgicalItems.count))").tag(0)
+                    Text("Datos del Sistema").tag(1)
+                    Text("Navegar Carpetas").tag(2)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 440)
+                .frame(width: 450)
 
                 Button {
                     Task {

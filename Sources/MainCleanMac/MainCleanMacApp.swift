@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 @main
-struct RamanSweepApp: App {
+struct MainCleanMacApp: App {
     @StateObject private var scanner = SystemScannerService()
 
     init() {
@@ -11,10 +11,10 @@ struct RamanSweepApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("RamanSweep · Adventurous M-Series Cleaner") {
+        WindowGroup("MainCleanMac") {
             ContentView()
                 .environmentObject(scanner)
-                .frame(minWidth: 980, minHeight: 640)
+                .frame(minWidth: 1020, minHeight: 660)
         }
         .windowResizability(.contentMinSize)
     }

@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "RamanSweep",
+    name: "MainCleanMac",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "RamanSweep", targets: ["RamanSweep"])
+        .executable(name: "MainCleanMac", targets: ["MainCleanMac"])
     ],
     targets: [
         .executableTarget(
-            name: "RamanSweep",
-            path: "Sources/RamanSweep"
+            name: "MainCleanMac",
+            path: "Sources/MainCleanMac"
         )
     ]
 )

@@ -2,41 +2,41 @@ import Foundation
 import SwiftUI
 
 enum NavigationTab: String, CaseIterable, Identifiable {
-    case dashboard = "Pulso Raman"
-    case smartCaches = "Barrido Láser"
-    case uninstaller = "Aplicaciones"
-    case appleSilicon = "Núcleo Chip M"
-    case spaceLens = "Espectro Disco"
+    case dashboard = "Resumen General"
+    case smartCaches = "Cachés y Datos"
+    case uninstaller = "Desinstalador"
+    case appleSilicon = "Desarrollo y Chip M"
+    case spaceLens = "Explorador de Disco"
 
     var id: String { rawValue }
 
     var tagline: String {
         switch self {
-        case .dashboard: return "ESTADO GENERAL Y SALUD"
-        case .smartCaches: return "PURGA DE CACHÉS Y BASURA"
-        case .uninstaller: return "APPS Y RESIDUOS HUÉRFANOS"
-        case .appleSilicon: return "BINARIOS ARM64, DOCKER Y CÓDIGO"
-        case .spaceLens: return "RAYOS X Y MAPA DE CARPETAS"
+        case .dashboard: return "Estado y acciones rápidas"
+        case .smartCaches: return "Limpiar basura sin perder sesiones"
+        case .uninstaller: return "Apps y restos de desinstalaciones"
+        case .appleSilicon: return "Proyectos, Node, Docker y Hardware"
+        case .spaceLens: return "Navegar carpetas por tamaño"
         }
     }
 
     var icon: String {
         switch self {
-        case .dashboard: return "waveform.path.ecg"
-        case .smartCaches: return "laser.burst"
-        case .uninstaller: return "square.stack.3d.up.fill"
-        case .appleSilicon: return "cpu.fill"
-        case .spaceLens: return "prism.fill"
+        case .dashboard: return "square.grid.2x2.fill"
+        case .smartCaches: return "cylinder.split.1x2.fill"
+        case .uninstaller: return "macwindow.badge.plus"
+        case .appleSilicon: return "terminal.fill"
+        case .spaceLens: return "folder.fill.badge.gearshape"
         }
     }
 
     var accentColor: Color {
         switch self {
-        case .dashboard: return RamanTheme.laserCyan
-        case .smartCaches: return RamanTheme.stokesAmber
-        case .uninstaller: return Color(red: 0.96, green: 0.36, blue: 0.62)
-        case .appleSilicon: return RamanTheme.emeraldSafe
-        case .spaceLens: return RamanTheme.antiStokesViolet
+        case .dashboard: return MainCleanTheme.brandBlue
+        case .smartCaches: return MainCleanTheme.safeGreen
+        case .uninstaller: return MainCleanTheme.deepAmber
+        case .appleSilicon: return MainCleanTheme.brandBlue
+        case .spaceLens: return MainCleanTheme.safeGreen
         }
     }
 }
@@ -315,6 +315,18 @@ struct SurgicalPurgeItem: Identifiable, Hashable {
     let sizeBytes: Int64
     let safety: SafetyLevel
     var isSelected: Bool = true
+}
+
+struct SystemDataXRayItem: Identifiable, Hashable {
+    var id: String { path }
+    let title: String
+    let category: String
+    let explanation: String
+    let path: String
+    let sizeBytes: Int64
+    let safety: SafetyLevel
+    let canCleanDirectly: Bool
+    var customAction: String? = nil
 }
 
 enum SafetyGuard {

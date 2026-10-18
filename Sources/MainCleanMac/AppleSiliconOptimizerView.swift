@@ -105,16 +105,16 @@ struct AppleSiliconOptimizerView: View {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Núcleo Chip M")
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                        Text("Desarrollo y Chip M")
+                            .font(.system(size: 24, weight: .bold))
                         Text(scanner.mSeriesStatus.chipName.uppercased())
-                            .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(RamanTheme.emeraldSafe)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(MainCleanTheme.emeraldSafe)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(RamanTheme.emeraldSafe.opacity(0.16), in: Capsule())
+                            .background(MainCleanTheme.emeraldSafe.opacity(0.14), in: Capsule())
                     }
-                    Text("Ingeniería de bajo nivel para Apple Silicon, binarios arm64, proyectos de código y Docker.")
+                    Text("Limpia dependencias pesadas de proyectos (node_modules/.venv), contenedores Docker, SQLite y binarios Apple Silicon.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -122,8 +122,8 @@ struct AppleSiliconOptimizerView: View {
                 Spacer()
 
                 Picker("", selection: $selectedSection) {
-                    Text("Motor M-Series").tag(0)
-                    Text("Binarios arm64").tag(1)
+                    Text("Optimización M").tag(0)
+                    Text("Arquitectura Apps").tag(1)
                     Text("Proyectos (\(scanner.projectArtifacts.count))").tag(2)
                     Text("Docker").tag(3)
                 }

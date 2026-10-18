@@ -29,16 +29,16 @@ struct AppUninstallerView: View {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Aplicaciones")
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                        Text("DESINSTALADOR PROFUNDO")
-                            .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(Color(red: 0.96, green: 0.36, blue: 0.62))
+                        Text("Desinstalador")
+                            .font(.system(size: 24, weight: .bold))
+                        Text("APPS Y RESTOS DE DESINSTALACIÓN")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(MainCleanTheme.crimsonDanger)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(Color(red: 0.96, green: 0.36, blue: 0.62).opacity(0.14), in: Capsule())
+                            .background(MainCleanTheme.crimsonDanger.opacity(0.14), in: Capsule())
                     }
-                    Text("Selecciona una aplicación a la izquierda para inspeccionar todas sus carpetas ocultas y desinstalarla sin dejar rastro.")
+                    Text("Desinstala aplicaciones junto con sus carpetas ocultas o elimina restos de programas que ya borraste antes.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -46,11 +46,11 @@ struct AppUninstallerView: View {
                 Spacer()
 
                 Picker("", selection: $mode) {
-                    Text("Instaladas (\(scanner.installedApps.count))").tag(0)
-                    Text("Huérfanos (\(scanner.orphanedLeftovers.count))").tag(1)
+                    Text("Apps Instaladas (\(scanner.installedApps.count))").tag(0)
+                    Text("Restos Huérfanos (\(scanner.orphanedLeftovers.count))").tag(1)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 260)
+                .frame(width: 300)
 
                 Menu {
                     Button {

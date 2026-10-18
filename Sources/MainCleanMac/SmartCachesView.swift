@@ -26,16 +26,16 @@ struct SmartCachesView: View {
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Barrido Láser")
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                        Text("PURGA SELECTIVA")
-                            .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(RamanTheme.stokesAmber)
+                        Text("Cachés y Datos")
+                            .font(.system(size: 24, weight: .bold))
+                        Text("TEMPORALES Y PAQUETES")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(MainCleanTheme.accentBlue)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(RamanTheme.stokesAmber.opacity(0.14), in: Capsule())
+                            .background(MainCleanTheme.accentBlue.opacity(0.14), in: Capsule())
                     }
-                    Text("Elimina cachés regenerables y archivos temporales organizados por categoría.")
+                    Text("Elimina cachés regenerables de navegadores, gestores de paquetes y registros sin cerrar tus sesiones.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -74,16 +74,16 @@ struct SmartCachesView: View {
                     }
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "laser.burst")
-                        Text("Barrer \(ByteFormatter.string(from: scanner.totalSelectedCacheBytes))")
-                            .fontWeight(.bold)
+                        Image(systemName: "sparkles")
+                        Text("Limpiar \(ByteFormatter.string(from: scanner.totalSelectedCacheBytes))")
+                            .fontWeight(.semibold)
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(RamanTheme.stokesAmber)
-                .foregroundStyle(.black)
+                .tint(MainCleanTheme.emeraldSafe)
+                .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.08))
                 .disabled(scanner.totalSelectedCacheBytes == 0 || scanner.isCleaningCaches)
             }
             .padding(.horizontal, 28)
@@ -95,8 +95,8 @@ struct SmartCachesView: View {
                 VStack(spacing: 14) {
                     ProgressView()
                         .scaleEffect(1.15)
-                        .tint(RamanTheme.stokesAmber)
-                    Text("Escaneando espectros de caché en tu Mac...")
+                        .tint(MainCleanTheme.accentBlue)
+                    Text("Analizando cachés y archivos temporales en tu Mac...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -105,8 +105,8 @@ struct SmartCachesView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(RamanTheme.emeraldSafe)
-                    Text("Espectro de Cachés Limpio")
+                        .foregroundStyle(MainCleanTheme.emeraldSafe)
+                    Text("Cachés Optimizadas")
                         .font(.title3.bold())
                     Text("No se detectaron archivos temporales pendientes por liberar.")
                         .font(.subheadline)

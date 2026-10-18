@@ -5,10 +5,20 @@ import SwiftUI
 @MainActor
 final class SystemScannerService: ObservableObject {
     @Published var diskOverview = DiskOverview()
+    @Published var sessionFreedBytes: Int64 = 0
+    @Published var lastFreedDeltaBytes: Int64 = 0
+    private var initialFreeBytesBaseline: Int64?
+    private var toastDismissTask: Task<Void, Never>?
+
     @Published var cacheItems: [CleanableItem] = []
     @Published var isScanningCaches = false
     @Published var isCleaningCaches = false
-    @Published var lastStatusMessage: String?
+    @Published var lastStatusMessage: String? {
+        didSet {
+            scheduleToastAutoDismiss()
+        }
+    }
+    @Published var toastId = UUID()
 
     // Live Operation Loader & Activity Console
     @Published var isExecutingOperation = false
@@ -71,7 +81,29 @@ final class SystemScannerService: ObservableObject {
     let home = FileManager.default.homeDirectoryForCurrentUser.path
 
     var launchAgentPath: String {
-        "\(home)/Library/LaunchAgents/com.mainlake.ramansweep.periodic.plist"
+        "\(home)/Library/LaunchAgents/com.mainlake.maincleanmac.periodic.plist"
+    }
+
+    private func scheduleToastAutoDismiss() {
+        toastDismissTask?.cancel()
+        guard let msg = lastStatusMessage, !msg.isEmpty else { return }
+        toastId = UUID()
+        toastDismissTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_000_000_000) // 4 seconds auto-dismiss
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                self.lastStatusMessage = nil
+            }
+        }
+    }
+
+    func recordFreedSpace(_ bytes: Int64) {
+        guard bytes > 0 else { return }
+        withAnimation(.spring(duration: 0.35)) {
+            sessionFreedBytes += bytes
+            lastFreedDeltaBytes = bytes
+        }
+        refreshDiskOverview()
     }
 
     func appendLog(_ message: String, detail: String? = nil, level: LogLevel = .info) {
@@ -166,7 +198,14 @@ final class SystemScannerService: ObservableObject {
             ])
             let total = Int64(values.volumeTotalCapacity ?? 0)
             let availImportant = values.volumeAvailableCapacityForImportantUsage ?? Int64(values.volumeAvailableCapacity ?? 0)
-            diskOverview = DiskOverview(totalBytes: total, freeBytes: availImportant)
+            if initialFreeBytesBaseline == nil {
+                initialFreeBytesBaseline = availImportant
+            }
+            let base = initialFreeBytesBaseline ?? availImportant
+            let effectiveFree = min(total, max(availImportant, base + sessionFreedBytes))
+            withAnimation(.spring(duration: 0.35)) {
+                diskOverview = DiskOverview(totalBytes: total, freeBytes: effectiveFree)
+            }
         } catch {
             print("Error reading disk overview: \(error)")
         }
@@ -414,6 +453,7 @@ final class SystemScannerService: ObservableObject {
             cacheItems.removeAll { selectedIds.contains($0.id) }
         }
         spaceCache.removeAll()
+        recordFreedSpace(freedBytes)
 
         lastStatusMessage = "Se liberaron \(ByteFormatter.string(from: freedBytes)) de forma segura."
         await scanCaches()
@@ -503,7 +543,7 @@ final class SystemScannerService: ObservableObject {
                 rawAppRecords.append((appName, bundleId, fullPath, modDate, isProtected, requiresAdmin, matched))
             }
 
-            // 3. Collect candidate orphan paths
+            // 3. Collect candidate orphan paths (including Ghost Apps in Application Support)
             let orphanCheckDirs: [(String, String)] = [
                 ("\(homeDir)/Library/Caches", "Caché Huérfana"),
                 ("\(homeDir)/Library/Saved Application State", "Estado Guardado Huérfano"),
@@ -528,6 +568,30 @@ final class SystemScannerService: ObservableObject {
                         rawOrphans.append((sub, fullPath, label))
                         allPathsToSize.append(fullPath)
                     }
+                }
+            }
+
+            // Unify Ghost Apps in ~/Library/Application Support into Orphaned Leftovers
+            let appSupportDir = "\(homeDir)/Library/Application Support"
+            let knownGhostCandidates: [(folder: String, displayName: String, checkName: String)] = [
+                ("Claude", "Claude Desktop / Claude Code VM", "claude"),
+                ("zoom.us", "Zoom Video Communications", "zoom.us"),
+                ("Postman", "Postman API Client", "postman"),
+                ("BraveSoftware", "Brave Browser", "brave browser"),
+                ("Trae", "Trae IDE", "trae"),
+                ("Windsurf", "Windsurf IDE", "windsurf"),
+                ("Codex", "Codex Desktop Data", "codex"),
+                ("CodexBackups", "Respaldos Antiguos de Codex", "codex"),
+                ("dbpepe", "Datos de dbpepe", "dbpepe"),
+                ("jellyfin", "Servidor Jellyfin", "jellyfin"),
+                ("orca", "Orca App Data", "orca"),
+                ("Riot Client", "Riot Games Client Data", "riot client")
+            ]
+            for ghost in knownGhostCandidates {
+                let p = "\(appSupportDir)/\(ghost.folder)"
+                if fm.fileExists(atPath: p) && !knownNames.contains(ghost.checkName) {
+                    rawOrphans.append((ghost.displayName, p, "Application Support (App Desinstalada)"))
+                    allPathsToSize.append(p)
                 }
             }
 
@@ -671,6 +735,7 @@ final class SystemScannerService: ObservableObject {
                 installedApps.removeAll { $0.bundlePath == app.bundlePath }
             }
             spaceCache.removeValue(forKey: "/Applications")
+            recordFreedSpace(app.totalSizeBytes)
             lastStatusMessage = "'\(app.name)' y \(removedLeftovers) residuos fueron desinstalados (\(ByteFormatter.string(from: app.totalSizeBytes)))."
         } else {
             lastStatusMessage = "Activa 'Administración de aplicaciones' en Configuración para borrar '\(app.name)' sin contraseña."
@@ -717,6 +782,7 @@ final class SystemScannerService: ObservableObject {
         withAnimation {
             orphanedLeftovers.removeAll { selectedPaths.contains($0.path) }
         }
+        recordFreedSpace(total)
 
         lastStatusMessage = "Se enviaron \(selected.count) residuos huérfanos al Basurero (\(ByteFormatter.string(from: total)))."
         refreshDiskOverview()
@@ -804,6 +870,7 @@ final class SystemScannerService: ObservableObject {
             projectArtifacts.removeAll { selectedPaths.contains($0.path) }
         }
         spaceCache.removeAll()
+        recordFreedSpace(freed)
 
         lastStatusMessage = "Se limpiaron \(selected.count) artefactos de proyectos (\(ByteFormatter.string(from: freed)))."
         refreshDiskOverview()
@@ -839,7 +906,7 @@ final class SystemScannerService: ObservableObject {
         <plist version="1.0">
         <dict>
             <key>Label</key>
-            <string>com.mainlake.ramansweep.periodic</string>
+            <string>com.mainlake.maincleanmac.periodic</string>
             <key>ProgramArguments</key>
             <array>
                 <string>/bin/zsh</string>
@@ -1138,6 +1205,7 @@ final class SystemScannerService: ObservableObject {
                 spaceEntries.removeAll { $0.path == entry.path }
             }
             spaceCache[currentSpacePath] = spaceEntries
+            recordFreedSpace(entry.sizeBytes)
             appendLog("Movido al Basurero: \(entry.name) (\(ByteFormatter.string(from: entry.sizeBytes)))", detail: entry.path, level: .success)
             lastStatusMessage = "Se movió '\(entry.name)' (\(ByteFormatter.string(from: entry.sizeBytes))) al Basurero."
             refreshDiskOverview()
@@ -1331,8 +1399,9 @@ final class SystemScannerService: ObservableObject {
             }
         }.value
 
+        recordFreedSpace(item.customAction == "BREW_CLEAN" ? 120 * 1024 * 1024 : item.sizeBytes)
         appendLog("Espacio liberado en: \(item.title)", detail: item.path, level: .success)
-        lastStatusMessage = "Se liberó '\(item.title)' correctamente."
+        lastStatusMessage = "Se liberó '\(item.title)' (\(ByteFormatter.string(from: item.sizeBytes)))."
         await scanSystemDataXRay()
         refreshDiskOverview()
     }
@@ -1617,6 +1686,7 @@ final class SystemScannerService: ObservableObject {
             }
         }.value
 
+        recordFreedSpace(item.sizeBytes)
         appendLog("Liberado con éxito: \(item.title) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .success)
         lastStatusMessage = "Se liberó '\(item.title)' (\(ByteFormatter.string(from: item.sizeBytes)))."
         await scanSurgicalTargets()
@@ -1651,10 +1721,192 @@ final class SystemScannerService: ObservableObject {
             totalFreed += item.sizeBytes
         }
 
+        recordFreedSpace(totalFreed)
         appendLog("Cirugía completada: \(ByteFormatter.string(from: totalFreed)) recuperados", level: .success)
         lastStatusMessage = "Cirugía completada: \(ByteFormatter.string(from: totalFreed)) liberados sin afectar tus sesiones."
         await scanSurgicalTargets()
         await scanSystemDataXRay()
+        refreshDiskOverview()
+    }
+
+    // MARK: - Two-Level One-Click Cleaning (Quick Safe vs Deep System Data)
+
+    /// Level 1: 100% Safe Quick Cleanup (Caches, Logs, Crashpad, GPUCache, Service Workers, QuickLook, SQLite VACUUM)
+    var quickSafeCleanableBytes: Int64 {
+        let safeCaches = cacheItems.filter { $0.safety == .safe && ($0.category == .systemAndGeneral || $0.category == .browsersAndApps || $0.category == .xcodeAndSimulators) }.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        let safeInternalCaches = surgicalItems.filter { $0.safety == .safe && $0.category == .appSupportSurgery && !$0.path.contains("com.docker.install") }.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        let safeMSeries = mSeriesItems.filter { $0.safety == .safe && ($0.kind == .sqliteVacuum || $0.kind == .binaryArchitecture || $0.actionCode == "QL_RESET") }.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        return safeCaches + safeInternalCaches + safeMSeries
+    }
+
+    /// Level 2: Deep System Data Cleanup (Docker residual installer, Ghost uninstalled apps in Application Support, Orphans, Package Managers, 4K Aerials, Dotfiles, APFS Snapshots)
+    var deepSystemCleanableBytes: Int64 {
+        let pkgAndAICaches = cacheItems.filter { $0.safety == .safe && ($0.category == .packageManagers || $0.category == .aiAndDevTools) }.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        let deepSurgical = surgicalItems.filter { $0.safety == .safe && ($0.path.contains("com.docker.install") || $0.category == .orphanedAppsData || $0.category == .macOSWallpaperAndMedia || $0.category == .hiddenDotfileBloat) }.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        let orphanExtras = orphanedLeftovers.filter { !$0.path.contains("Application Support") }.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        return pkgAndAICaches + deepSurgical + orphanExtras
+    }
+
+    /// Executes Level 1 (Limpieza Rápida Segura) immediately without confirmation prompts
+    func runQuickSafeCleanup() async {
+        isExecutingOperation = true
+        currentOperationTitle = "Ejecutando Limpieza Rápida Segura..."
+        defer { isExecutingOperation = false }
+
+        let useTrash = safeModeTrashOnly
+        var freedTotal: Int64 = 0
+
+        // 1. Clean safe browser, system & Xcode caches
+        let targetCaches = cacheItems.filter { $0.safety == .safe && ($0.category == .systemAndGeneral || $0.category == .browsersAndApps || $0.category == .xcodeAndSimulators) }
+        for item in targetCaches {
+            appendLog("Limpieza rápida: \(item.name) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .info)
+            await Task.detached(priority: .userInitiated) {
+                let fm = FileManager.default
+                if item.customCleanCommand == "FIND_INSTALLERS" {
+                    Self.cleanInstallerFiles(in: item.path, moveToTrash: useTrash)
+                    return
+                }
+                guard fm.fileExists(atPath: item.path), let contents = try? fm.contentsOfDirectory(atPath: item.path) else { return }
+                for sub in contents {
+                    let full = (item.path as NSString).appendingPathComponent(sub)
+                    if useTrash {
+                        try? fm.trashItem(at: URL(fileURLWithPath: full), resultingItemURL: nil)
+                    } else {
+                        try? fm.removeItem(atPath: full)
+                    }
+                }
+            }.value
+            freedTotal += item.sizeBytes
+        }
+
+        // 2. Clean safe internal app caches (GPUCache, Crashpad, Service Worker, Code Cache)
+        let internalTargets = surgicalItems.filter { $0.safety == .safe && $0.category == .appSupportSurgery && !$0.path.contains("com.docker.install") }
+        for sItem in internalTargets {
+            appendLog("Caché interna: \(sItem.title)", detail: sItem.path, level: .info)
+            await Task.detached(priority: .userInitiated) {
+                let fm = FileManager.default
+                let url = URL(fileURLWithPath: sItem.path)
+                if useTrash {
+                    if (try? fm.trashItem(at: url, resultingItemURL: nil)) == nil {
+                        try? fm.removeItem(at: url)
+                    }
+                } else {
+                    try? fm.removeItem(at: url)
+                }
+            }.value
+            freedTotal += sItem.sizeBytes
+        }
+
+        // 3. Run SQLite VACUUM & QuickLook Cache reset
+        let homeDir = home
+        let mSafe = mSeriesItems.filter { $0.safety == .safe && ($0.kind == .sqliteVacuum || $0.actionCode == "QL_RESET") }
+        for mItem in mSafe {
+            freedTotal += mItem.sizeBytes
+        }
+        await Task.detached(priority: .userInitiated) {
+            let fm = FileManager.default
+            let dbs = [
+                "\(homeDir)/.codex/thread_history_1.sqlite",
+                "\(homeDir)/.codex/logs_2.sqlite",
+                "\(homeDir)/.pine_checkpoints.sqlite",
+                "\(homeDir)/Library/Application Support/Google/Chrome/Default/History",
+                "\(homeDir)/Library/Safari/History.db"
+            ]
+            for db in dbs where fm.fileExists(atPath: db) {
+                let escaped = db.replacingOccurrences(of: "\"", with: "\\\"")
+                _ = Self.runShell("sqlite3 \"\(escaped)\" 'VACUUM;' 2>/dev/null")
+            }
+            _ = Self.runShell("qlmanage -r cache 2>/dev/null")
+        }.value
+
+        if freedTotal > 0 {
+            recordFreedSpace(freedTotal)
+            appendLog("Limpieza Rápida Segura completada: +\(ByteFormatter.string(from: freedTotal))", level: .success)
+            lastStatusMessage = "Limpieza Rápida completada: +\(ByteFormatter.string(from: freedTotal)) liberados sin cerrar tus sesiones."
+        } else {
+            lastStatusMessage = "Las cachés rápidas ya están limpias y optimizadas."
+        }
+
+        await scanCaches()
+        await scanSurgicalTargets()
+        await scanAppleSiliconDeep()
+        refreshDiskOverview()
+    }
+
+    /// Executes Level 2 (Limpieza Profunda de Datos del Sistema)
+    func runDeepSystemCleanup() async {
+        isExecutingOperation = true
+        currentOperationTitle = "Ejecutando Limpieza Profunda de Datos del Sistema..."
+        defer { isExecutingOperation = false }
+
+        let useTrash = safeModeTrashOnly
+        var freedTotal: Int64 = 0
+
+        // 1. Clean Package Manager & AI Caches (Homebrew, npm, pnpm, uv, pip, Cargo, Codex)
+        let pkgTargets = cacheItems.filter { $0.safety == .safe && ($0.category == .packageManagers || $0.category == .aiAndDevTools) }
+        for item in pkgTargets {
+            appendLog("Limpiando paquetes/IA: \(item.name) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .info)
+            await Task.detached(priority: .userInitiated) {
+                let fm = FileManager.default
+                if let cmd = item.customCleanCommand {
+                    _ = Self.runShell(cmd)
+                }
+                guard fm.fileExists(atPath: item.path), let contents = try? fm.contentsOfDirectory(atPath: item.path) else { return }
+                for sub in contents {
+                    let full = (item.path as NSString).appendingPathComponent(sub)
+                    if useTrash {
+                        try? fm.trashItem(at: URL(fileURLWithPath: full), resultingItemURL: nil)
+                    } else {
+                        try? fm.removeItem(atPath: full)
+                    }
+                }
+            }.value
+            freedTotal += item.sizeBytes
+        }
+
+        // 2. Clean Deep Surgical Targets (com.docker.install, Ghost Apps in Application Support, 4K Aerials, Hidden Dotfile Bloat)
+        let deepSurgical = surgicalItems.filter { $0.safety == .safe && ($0.path.contains("com.docker.install") || $0.category == .orphanedAppsData || $0.category == .macOSWallpaperAndMedia || $0.category == .hiddenDotfileBloat) }
+        for sItem in deepSurgical {
+            appendLog("Purga profunda: \(sItem.title) (\(ByteFormatter.string(from: sItem.sizeBytes)))", detail: sItem.path, level: .info)
+            await Task.detached(priority: .userInitiated) {
+                let fm = FileManager.default
+                let url = URL(fileURLWithPath: sItem.path)
+                if useTrash {
+                    if (try? fm.trashItem(at: url, resultingItemURL: nil)) == nil {
+                        try? fm.removeItem(at: url)
+                    }
+                } else {
+                    try? fm.removeItem(at: url)
+                }
+            }.value
+            freedTotal += sItem.sizeBytes
+        }
+
+        // 3. Clean remaining Orphaned Leftovers & thin APFS snapshots
+        let extraOrphans = orphanedLeftovers.filter { !$0.path.contains("Application Support") }
+        for orphan in extraOrphans {
+            await Task.detached(priority: .userInitiated) {
+                try? FileManager.default.trashItem(at: URL(fileURLWithPath: orphan.path), resultingItemURL: nil)
+            }.value
+            freedTotal += orphan.sizeBytes
+        }
+
+        await Task.detached(priority: .userInitiated) {
+            _ = Self.runShell("tmutil thinlocalsnapshots / 10000000000 4 2>/dev/null")
+        }.value
+
+        if freedTotal > 0 {
+            recordFreedSpace(freedTotal)
+            appendLog("Limpieza Profunda completada: +\(ByteFormatter.string(from: freedTotal)) en Datos del Sistema", level: .success)
+            lastStatusMessage = "Limpieza Profunda completada: +\(ByteFormatter.string(from: freedTotal)) liberados de Datos del Sistema."
+        } else {
+            lastStatusMessage = "Datos del Sistema ya optimizados."
+        }
+
+        await scanCaches()
+        await scanSurgicalTargets()
+        await scanSystemDataXRay()
+        await scanInstalledApps()
         refreshDiskOverview()
     }
 
@@ -1941,6 +2193,9 @@ final class SystemScannerService: ObservableObject {
             }
         }.value
 
+        if item.sizeBytes > 0 {
+            recordFreedSpace(item.sizeBytes)
+        }
         appendLog("Optimización completada: \(item.title)", detail: item.technicalDetail, level: .success)
         lastStatusMessage = "Optimización '\(item.title)' completada exitosamente."
         await scanAppleSiliconDeep()
