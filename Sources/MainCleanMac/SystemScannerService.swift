@@ -7,7 +7,6 @@ final class SystemScannerService: ObservableObject {
     @Published var diskOverview = DiskOverview()
     @Published var sessionFreedBytes: Int64 = 0
     @Published var lastFreedDeltaBytes: Int64 = 0
-    private var initialFreeBytesBaseline: Int64?
     private var toastDismissTask: Task<Void, Never>?
 
     @Published var cacheItems: [CleanableItem] = []
@@ -198,14 +197,9 @@ final class SystemScannerService: ObservableObject {
                 .volumeAvailableCapacityKey
             ])
             let total = Int64(values.volumeTotalCapacity ?? 0)
-            let availImportant = values.volumeAvailableCapacityForImportantUsage ?? Int64(values.volumeAvailableCapacity ?? 0)
-            if initialFreeBytesBaseline == nil {
-                initialFreeBytesBaseline = availImportant
-            }
-            let base = initialFreeBytesBaseline ?? availImportant
-            let effectiveFree = min(total, max(availImportant, base + sessionFreedBytes))
+            let realAvailable = values.volumeAvailableCapacityForImportantUsage ?? Int64(values.volumeAvailableCapacity ?? 0)
             withAnimation(.spring(duration: 0.35)) {
-                diskOverview = DiskOverview(totalBytes: total, freeBytes: effectiveFree)
+                diskOverview = DiskOverview(totalBytes: total, freeBytes: realAvailable)
             }
         } catch {
             print("Error reading disk overview: \(error)")
@@ -345,7 +339,7 @@ final class SystemScannerService: ObservableObject {
         let scanned: [CleanableItem] = await Task.detached(priority: .userInitiated) {
             let fm = FileManager.default
             // Measure all existing target paths in a SINGLE du call instead of 24 separate shell processes
-            let normalPaths = targets.filter { $0.7 != "FIND_INSTALLERS" && fm.fileExists(atPath: $0.2) }.map(\.2)
+            let normalPaths = targets.filter { $0.7 != "FIND_INSTALLERS" && fm.fileExists(atPath: $0.3) }.map(\.3)
             let batchSizes = Self.batchSizesForPaths(normalPaths)
 
             var results: [CleanableItem] = []
@@ -418,11 +412,12 @@ final class SystemScannerService: ObservableObject {
         }
 
         let useTrash = safeModeTrashOnly
-        let freedBytes = selected.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        var actualFreedTotal: Int64 = 0
         let selectedIds = Set(selected.map(\.id))
 
         for item in selected {
-            appendLog("Procesando \(item.name) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .info)
+            let initialSize = item.sizeBytes
+            appendLog("Procesando \(item.name) (\(ByteFormatter.string(from: initialSize)))", detail: item.path, level: .info)
 
             await Task.detached(priority: .userInitiated) {
                 let fm = FileManager.default
@@ -439,7 +434,9 @@ final class SystemScannerService: ObservableObject {
                     for sub in contents {
                         let fullPath = (item.path as NSString).appendingPathComponent(sub)
                         if useTrash && !item.path.hasSuffix("/.Trash") {
-                            try? fm.trashItem(at: URL(fileURLWithPath: fullPath), resultingItemURL: nil)
+                            if (try? fm.trashItem(at: URL(fileURLWithPath: fullPath), resultingItemURL: nil)) == nil {
+                                try? fm.removeItem(atPath: fullPath)
+                            }
                         } else {
                             try? fm.removeItem(atPath: fullPath)
                         }
@@ -447,16 +444,23 @@ final class SystemScannerService: ObservableObject {
                 }
             }.value
 
-            appendLog("Completado: \(item.name)", detail: useTrash ? "Movido al Basurero" : "Eliminado", level: .success)
+            let remaining = Self.batchSizesForPaths([item.path])[item.path] ?? 0
+            let actualFreed = max(0, initialSize - remaining)
+            actualFreedTotal += actualFreed
+
+            appendLog("Completado: \(item.name)", detail: actualFreed > 0 ? "+\(ByteFormatter.string(from: actualFreed)) liberados" : "Archivos protegidos o en uso", level: actualFreed > 0 ? .success : .info)
         }
 
         withAnimation {
             cacheItems.removeAll { selectedIds.contains($0.id) }
         }
         spaceCache.removeAll()
-        recordFreedSpace(freedBytes)
-
-        lastStatusMessage = "Se liberaron \(ByteFormatter.string(from: freedBytes)) de forma segura."
+        if actualFreedTotal > 0 {
+            recordFreedSpace(actualFreedTotal)
+            lastStatusMessage = "Se liberaron \(ByteFormatter.string(from: actualFreedTotal)) de forma segura."
+        } else {
+            lastStatusMessage = "No se liberó espacio adicional (archivos en uso o protegidos)."
+        }
         await scanCaches()
         refreshDiskOverview()
     }
@@ -766,26 +770,35 @@ final class SystemScannerService: ObservableObject {
         currentOperationTitle = "Limpiando Residuos Huérfanos..."
         defer { isExecutingOperation = false }
 
-        let total = selected.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        var actualFreed: Int64 = 0
         let fm = FileManager.default
-        let selectedPaths = Set(selected.map(\.path))
+        var deletedPaths = Set<String>()
 
         for item in selected {
             appendLog("Moviendo huérfano \(item.name) al Basurero...", detail: item.path, level: .info)
-            do {
-                try fm.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)
+            let url = URL(fileURLWithPath: item.path)
+            let wasTrashed = (try? fm.trashItem(at: url, resultingItemURL: nil)) != nil
+            if !wasTrashed {
+                _ = try? fm.removeItem(at: url)
+            }
+            if !fm.fileExists(atPath: item.path) {
+                actualFreed += item.sizeBytes
+                deletedPaths.insert(item.path)
                 appendLog("Huérfano eliminado: \(item.name)", detail: item.path, level: .success)
-            } catch {
-                appendLog("Error en \(item.name): \(error.localizedDescription)", detail: item.path, level: .warning)
+            } else {
+                appendLog("No se pudo eliminar \(item.name): permiso denegado o archivo en uso", detail: item.path, level: .warning)
             }
         }
 
         withAnimation {
-            orphanedLeftovers.removeAll { selectedPaths.contains($0.path) }
+            orphanedLeftovers.removeAll { deletedPaths.contains($0.path) }
         }
-        recordFreedSpace(total)
-
-        lastStatusMessage = "Se enviaron \(selected.count) residuos huérfanos al Basurero (\(ByteFormatter.string(from: total)))."
+        if actualFreed > 0 {
+            recordFreedSpace(actualFreed)
+            lastStatusMessage = "Se eliminaron \(deletedPaths.count) residuos huérfanos (\(ByteFormatter.string(from: actualFreed)))."
+        } else {
+            lastStatusMessage = "No se pudieron eliminar los residuos seleccionados (en uso o protegidos)."
+        }
         refreshDiskOverview()
         buildRecommendations()
     }
@@ -850,30 +863,42 @@ final class SystemScannerService: ObservableObject {
         currentOperationTitle = "Purgando Artefactos de Proyectos..."
         defer { isExecutingOperation = false }
 
-        let freed = selected.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        var actualFreed: Int64 = 0
         let useTrash = safeModeTrashOnly
-        let selectedPaths = Set(selected.map(\.path))
+        var deletedPaths = Set<String>()
 
         for item in selected {
             appendLog("Limpiando \(item.projectName)/\(item.artifactType) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .info)
             await Task.detached(priority: .userInitiated) {
                 let fm = FileManager.default
                 if useTrash {
-                    try? fm.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)
+                    if (try? fm.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)) == nil {
+                        try? fm.removeItem(atPath: item.path)
+                    }
                 } else {
                     try? fm.removeItem(atPath: item.path)
                 }
             }.value
-            appendLog("Eliminado \(item.projectName)/\(item.artifactType)", detail: item.path, level: .success)
+
+            if !FileManager.default.fileExists(atPath: item.path) {
+                actualFreed += item.sizeBytes
+                deletedPaths.insert(item.path)
+                appendLog("Eliminado \(item.projectName)/\(item.artifactType)", detail: item.path, level: .success)
+            } else {
+                appendLog("No se pudo eliminar \(item.projectName)/\(item.artifactType)", detail: item.path, level: .warning)
+            }
         }
 
         withAnimation {
-            projectArtifacts.removeAll { selectedPaths.contains($0.path) }
+            projectArtifacts.removeAll { deletedPaths.contains($0.path) }
         }
         spaceCache.removeAll()
-        recordFreedSpace(freed)
-
-        lastStatusMessage = "Se limpiaron \(selected.count) artefactos de proyectos (\(ByteFormatter.string(from: freed)))."
+        if actualFreed > 0 {
+            recordFreedSpace(actualFreed)
+            lastStatusMessage = "Se limpiaron \(deletedPaths.count) artefactos de proyectos (\(ByteFormatter.string(from: actualFreed)))."
+        } else {
+            lastStatusMessage = "No se pudieron eliminar los artefactos seleccionados."
+        }
         refreshDiskOverview()
         buildRecommendations()
     }
@@ -1383,26 +1408,36 @@ final class SystemScannerService: ObservableObject {
         currentOperationTitle = "Liberando \(item.title)..."
         defer { isExecutingOperation = false }
 
+        let initialSize = item.sizeBytes
         appendLog("Limpiando: \(item.title)", detail: item.path, level: .info)
 
-        await Task.detached(priority: .userInitiated) {
+        let actualFreed: Int64 = await Task.detached(priority: .userInitiated) { () -> Int64 in
             let fm = FileManager.default
             if item.customAction == "BREW_CLEAN" {
+                let initial = Self.batchSizesForPaths(["/opt/homebrew/Caskroom", "\(NSHomeDirectory())/Library/Caches/Homebrew"]).values.reduce(0, +)
                 _ = Self.runShell("/opt/homebrew/bin/brew cleanup --prune=all && /opt/homebrew/bin/brew autoremove")
-                return
+                let remaining = Self.batchSizesForPaths(["/opt/homebrew/Caskroom", "\(NSHomeDirectory())/Library/Caches/Homebrew"]).values.reduce(0, +)
+                return max(0, initial - remaining)
             }
             if item.customAction == "GO_CLEAN" {
                 _ = Self.runShell("go clean -modcache -cache 2>/dev/null")
-                return
+                return 0
             }
             if (try? fm.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)) == nil {
                 try? fm.removeItem(atPath: item.path)
             }
+            let remaining = fm.fileExists(atPath: item.path) ? (Self.batchSizesForPaths([item.path])[item.path] ?? 0) : 0
+            return max(0, initialSize - remaining)
         }.value
 
-        recordFreedSpace(item.customAction == "BREW_CLEAN" ? 120 * 1024 * 1024 : item.sizeBytes)
-        appendLog("Liberado: \(item.title)", detail: item.path, level: .success)
-        lastStatusMessage = "\(item.title) liberado (\(ByteFormatter.string(from: item.sizeBytes)))"
+        if actualFreed > 0 {
+            recordFreedSpace(actualFreed)
+            appendLog("Liberado con éxito: \(item.title) (\(ByteFormatter.string(from: actualFreed)))", detail: item.path, level: .success)
+            lastStatusMessage = "\(item.title) liberado (\(ByteFormatter.string(from: actualFreed)))"
+        } else {
+            appendLog("Operación completada en \(item.title)", detail: item.path, level: .info)
+            lastStatusMessage = "\(item.title) procesado."
+        }
         await scanSystemDataXRay()
         refreshDiskOverview()
     }
@@ -1703,6 +1738,7 @@ final class SystemScannerService: ObservableObject {
         currentOperationTitle = "Cirugía en curso: \(item.title)..."
         defer { isExecutingOperation = false }
 
+        let initialSize = item.sizeBytes
         let moveToTrash = safeModeTrashOnly
         appendLog("Limpieza quirúrgica: \(item.title)", detail: item.path, level: .info)
 
@@ -1718,9 +1754,16 @@ final class SystemScannerService: ObservableObject {
             }
         }.value
 
-        recordFreedSpace(item.sizeBytes)
-        appendLog("Liberado con éxito: \(item.title) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .success)
-        lastStatusMessage = "Se liberó '\(item.title)' (\(ByteFormatter.string(from: item.sizeBytes)))."
+        let remaining = FileManager.default.fileExists(atPath: item.path) ? (Self.batchSizesForPaths([item.path])[item.path] ?? 0) : 0
+        let actualFreed = max(0, initialSize - remaining)
+        if actualFreed > 0 {
+            recordFreedSpace(actualFreed)
+            appendLog("Liberado con éxito: \(item.title) (\(ByteFormatter.string(from: actualFreed)))", detail: item.path, level: .success)
+            lastStatusMessage = "Se liberó '\(item.title)' (\(ByteFormatter.string(from: actualFreed)))."
+        } else {
+            appendLog("No se pudo eliminar \(item.title) (archivo en uso o protegido)", detail: item.path, level: .warning)
+            lastStatusMessage = "No se pudo eliminar '\(item.title)'."
+        }
         await scanSurgicalTargets()
         await scanSystemDataXRay()
         refreshDiskOverview()
@@ -1738,7 +1781,8 @@ final class SystemScannerService: ObservableObject {
         var totalFreed: Int64 = 0
 
         for item in selected {
-            appendLog("Purgando: \(item.title) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .info)
+            let initialSize = item.sizeBytes
+            appendLog("Purgando: \(item.title) (\(ByteFormatter.string(from: initialSize)))", detail: item.path, level: .info)
             await Task.detached(priority: .userInitiated) {
                 let fm = FileManager.default
                 let url = URL(fileURLWithPath: item.path)
@@ -1750,12 +1794,19 @@ final class SystemScannerService: ObservableObject {
                     try? fm.removeItem(at: url)
                 }
             }.value
-            totalFreed += item.sizeBytes
+
+            let remaining = FileManager.default.fileExists(atPath: item.path) ? (Self.batchSizesForPaths([item.path])[item.path] ?? 0) : 0
+            let actualFreed = max(0, initialSize - remaining)
+            totalFreed += actualFreed
         }
 
-        recordFreedSpace(totalFreed)
-        appendLog("Cirugía completada: \(ByteFormatter.string(from: totalFreed)) recuperados", level: .success)
-        lastStatusMessage = "Cirugía completada: \(ByteFormatter.string(from: totalFreed)) liberados sin afectar tus sesiones."
+        if totalFreed > 0 {
+            recordFreedSpace(totalFreed)
+            appendLog("Cirugía completada: \(ByteFormatter.string(from: totalFreed)) recuperados", level: .success)
+            lastStatusMessage = "Cirugía completada: \(ByteFormatter.string(from: totalFreed)) liberados sin afectar tus sesiones."
+        } else {
+            lastStatusMessage = "No se pudieron liberar los objetivos seleccionados."
+        }
         await scanSurgicalTargets()
         await scanSystemDataXRay()
         refreshDiskOverview()
@@ -1763,12 +1814,11 @@ final class SystemScannerService: ObservableObject {
 
     // MARK: - Two-Level One-Click Cleaning (Quick Safe vs Deep System Data)
 
-    /// Level 1: 100% Safe Quick Cleanup (Caches, Logs, Crashpad, GPUCache, Service Workers, QuickLook, SQLite VACUUM)
+    /// Level 1: 100% Safe Quick Cleanup (Caches, Logs, Crashpad, GPUCache, Service Workers)
     var quickSafeCleanableBytes: Int64 {
         let safeCaches = cacheItems.filter { $0.safety == .safe && ($0.category == .systemAndGeneral || $0.category == .browsersAndApps || $0.category == .xcodeAndSimulators) }.reduce(Int64(0)) { $0 + $1.sizeBytes }
         let safeInternalCaches = surgicalItems.filter { $0.safety == .safe && $0.category == .appSupportSurgery && !$0.path.contains("com.docker.install") }.reduce(Int64(0)) { $0 + $1.sizeBytes }
-        let safeMSeries = mSeriesItems.filter { $0.safety == .safe && ($0.kind == .sqliteVacuum || $0.kind == .binaryArchitecture || $0.actionCode == "QL_RESET") }.reduce(Int64(0)) { $0 + $1.sizeBytes }
-        return safeCaches + safeInternalCaches + safeMSeries
+        return safeCaches + safeInternalCaches
     }
 
     /// Level 2: Deep System Data Cleanup (Docker residual installer, Ghost uninstalled apps in Application Support, Orphans, Package Managers, 4K Aerials, Dotfiles, APFS Snapshots)
@@ -1791,7 +1841,8 @@ final class SystemScannerService: ObservableObject {
         // 1. Clean safe browser, system & Xcode caches
         let targetCaches = cacheItems.filter { $0.safety == .safe && ($0.category == .systemAndGeneral || $0.category == .browsersAndApps || $0.category == .xcodeAndSimulators) }
         for item in targetCaches {
-            appendLog("Limpieza rápida: \(item.name) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .info)
+            let initialSize = item.sizeBytes
+            appendLog("Limpieza rápida: \(item.name) (\(ByteFormatter.string(from: initialSize)))", detail: item.path, level: .info)
             await Task.detached(priority: .userInitiated) {
                 let fm = FileManager.default
                 if item.customCleanCommand == "FIND_INSTALLERS" {
@@ -1802,19 +1853,25 @@ final class SystemScannerService: ObservableObject {
                 for sub in contents {
                     let full = (item.path as NSString).appendingPathComponent(sub)
                     if useTrash {
-                        try? fm.trashItem(at: URL(fileURLWithPath: full), resultingItemURL: nil)
+                        if (try? fm.trashItem(at: URL(fileURLWithPath: full), resultingItemURL: nil)) == nil {
+                            try? fm.removeItem(atPath: full)
+                        }
                     } else {
                         try? fm.removeItem(atPath: full)
                     }
                 }
             }.value
-            freedTotal += item.sizeBytes
+
+            let remaining = Self.batchSizesForPaths([item.path])[item.path] ?? 0
+            let actualFreed = max(0, initialSize - remaining)
+            freedTotal += actualFreed
         }
 
         // 2. Clean safe internal app caches (GPUCache, Crashpad, Service Worker, Code Cache)
         let internalTargets = surgicalItems.filter { $0.safety == .safe && $0.category == .appSupportSurgery && !$0.path.contains("com.docker.install") }
         for sItem in internalTargets {
-            appendLog("Caché interna: \(sItem.title)", detail: sItem.path, level: .info)
+            let initialSize = sItem.sizeBytes
+            appendLog("Caché interna: \(sItem.title) (\(ByteFormatter.string(from: initialSize)))", detail: sItem.path, level: .info)
             await Task.detached(priority: .userInitiated) {
                 let fm = FileManager.default
                 let url = URL(fileURLWithPath: sItem.path)
@@ -1826,15 +1883,15 @@ final class SystemScannerService: ObservableObject {
                     try? fm.removeItem(at: url)
                 }
             }.value
-            freedTotal += sItem.sizeBytes
+
+            let fm = FileManager.default
+            let remaining = fm.fileExists(atPath: sItem.path) ? (Self.batchSizesForPaths([sItem.path])[sItem.path] ?? 0) : 0
+            let actualFreed = max(0, initialSize - remaining)
+            freedTotal += actualFreed
         }
 
-        // 3. Run SQLite VACUUM & QuickLook Cache reset
+        // 3. Run SQLite VACUUM & QuickLook Cache reset (system performance optimization)
         let homeDir = home
-        let mSafe = mSeriesItems.filter { $0.safety == .safe && ($0.kind == .sqliteVacuum || $0.actionCode == "QL_RESET") }
-        for mItem in mSafe {
-            freedTotal += mItem.sizeBytes
-        }
         await Task.detached(priority: .userInitiated) {
             let fm = FileManager.default
             let dbs = [
@@ -1877,7 +1934,8 @@ final class SystemScannerService: ObservableObject {
         // 1. Clean Package Manager & AI Caches (Homebrew, npm, pnpm, uv, pip, Cargo, Codex)
         let pkgTargets = cacheItems.filter { $0.safety == .safe && ($0.category == .packageManagers || $0.category == .aiAndDevTools) }
         for item in pkgTargets {
-            appendLog("Limpiando paquetes/IA: \(item.name) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .info)
+            let initialSize = item.sizeBytes
+            appendLog("Limpiando paquetes/IA: \(item.name) (\(ByteFormatter.string(from: initialSize)))", detail: item.path, level: .info)
             await Task.detached(priority: .userInitiated) {
                 let fm = FileManager.default
                 if let cmd = item.customCleanCommand {
@@ -1887,19 +1945,25 @@ final class SystemScannerService: ObservableObject {
                 for sub in contents {
                     let full = (item.path as NSString).appendingPathComponent(sub)
                     if useTrash {
-                        try? fm.trashItem(at: URL(fileURLWithPath: full), resultingItemURL: nil)
+                        if (try? fm.trashItem(at: URL(fileURLWithPath: full), resultingItemURL: nil)) == nil {
+                            try? fm.removeItem(atPath: full)
+                        }
                     } else {
                         try? fm.removeItem(atPath: full)
                     }
                 }
             }.value
-            freedTotal += item.sizeBytes
+
+            let remaining = Self.batchSizesForPaths([item.path])[item.path] ?? 0
+            let actualFreed = max(0, initialSize - remaining)
+            freedTotal += actualFreed
         }
 
         // 2. Clean Deep Surgical Targets (com.docker.install, Ghost Apps in Application Support, 4K Aerials, Hidden Dotfile Bloat)
         let deepSurgical = surgicalItems.filter { $0.safety == .safe && ($0.path.contains("com.docker.install") || $0.category == .orphanedAppsData || $0.category == .macOSWallpaperAndMedia || $0.category == .hiddenDotfileBloat) }
         for sItem in deepSurgical {
-            appendLog("Purga profunda: \(sItem.title) (\(ByteFormatter.string(from: sItem.sizeBytes)))", detail: sItem.path, level: .info)
+            let initialSize = sItem.sizeBytes
+            appendLog("Purga profunda: \(sItem.title) (\(ByteFormatter.string(from: initialSize)))", detail: sItem.path, level: .info)
             await Task.detached(priority: .userInitiated) {
                 let fm = FileManager.default
                 let url = URL(fileURLWithPath: sItem.path)
@@ -1911,16 +1975,27 @@ final class SystemScannerService: ObservableObject {
                     try? fm.removeItem(at: url)
                 }
             }.value
-            freedTotal += sItem.sizeBytes
+
+            let fm = FileManager.default
+            let remaining = fm.fileExists(atPath: sItem.path) ? (Self.batchSizesForPaths([sItem.path])[sItem.path] ?? 0) : 0
+            let actualFreed = max(0, initialSize - remaining)
+            freedTotal += actualFreed
         }
 
         // 3. Clean remaining Orphaned Leftovers & thin APFS snapshots
         let extraOrphans = orphanedLeftovers.filter { !$0.path.contains("Application Support") }
         for orphan in extraOrphans {
+            let initialSize = orphan.sizeBytes
             await Task.detached(priority: .userInitiated) {
-                try? FileManager.default.trashItem(at: URL(fileURLWithPath: orphan.path), resultingItemURL: nil)
+                let fm = FileManager.default
+                let url = URL(fileURLWithPath: orphan.path)
+                if (try? fm.trashItem(at: url, resultingItemURL: nil)) == nil {
+                    try? fm.removeItem(atPath: orphan.path)
+                }
             }.value
-            freedTotal += orphan.sizeBytes
+            let remaining = FileManager.default.fileExists(atPath: orphan.path) ? (Self.batchSizesForPaths([orphan.path])[orphan.path] ?? 0) : 0
+            let actualFreed = max(0, initialSize - remaining)
+            freedTotal += actualFreed
         }
 
         await Task.detached(priority: .userInitiated) {
@@ -2115,25 +2190,19 @@ final class SystemScannerService: ObservableObject {
                 }
             }
 
-            // D) APFS Local Snapshots & QuickLook Thumbnail Cache
-            let qlCacheOut = Self.runShell("getconf DARWIN_USER_CACHE_DIR 2>/dev/null").output.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !qlCacheOut.isEmpty {
-                let qlSize = Self.batchSizesForPaths([qlCacheOut])[qlCacheOut] ?? 0
-                if qlSize > 5 * 1024 * 1024 {
-                    deepItems.append(MSeriesDeepItem(
-                        identifier: "darwin_quicklook_cache",
-                        title: "Caché de QuickLook y Shaders",
-                        subtitle: "Miniaturas y caché gráfica en /var/folders",
-                        technicalDetail: "qlmanage -r cache · \(qlCacheOut)",
-                        kind: .apfsSnapshotsAndSwap,
-                        sizeBytes: qlSize,
-                        safety: .safe,
-                        actionButtonTitle: "Limpiar",
-                        actionCode: "QL_RESET",
-                        targetPath: qlCacheOut
-                    ))
-                }
-            }
+            // D) QuickLook Thumbnail Cache Server Reset
+            deepItems.append(MSeriesDeepItem(
+                identifier: "darwin_quicklook_cache",
+                title: "Reiniciar Servidor de QuickLook",
+                subtitle: "Reinicia el demonio generador de miniaturas del sistema",
+                technicalDetail: "qlmanage -r cache",
+                kind: .apfsSnapshotsAndSwap,
+                sizeBytes: 0,
+                safety: .safe,
+                actionButtonTitle: "Reiniciar",
+                actionCode: "QL_RESET",
+                targetPath: nil
+            ))
 
             if status.localSnapshotsCount > 0 {
                 deepItems.append(MSeriesDeepItem(
@@ -2195,7 +2264,9 @@ final class SystemScannerService: ObservableObject {
         let homeDir = home
         appendLog("Ejecutando optimización M-Series: \(item.title)", detail: item.technicalDetail, level: .info)
 
-        await Task.detached(priority: .userInitiated) {
+        var actualFreedBytes: Int64 = 0
+
+        actualFreedBytes = await Task.detached(priority: .userInitiated) { () -> Int64 in
             let fm = FileManager.default
             switch item.actionCode {
             case "SQLITE_VACUUM":
@@ -2205,28 +2276,39 @@ final class SystemScannerService: ObservableObject {
                     "\(homeDir)/.pine_checkpoints.sqlite",
                     "\(homeDir)/Library/Application Support/Google/Chrome/Default/History",
                     "\(homeDir)/Library/Safari/History.db"
-                ]
-                for db in dbs where fm.fileExists(atPath: db) {
+                ].filter { fm.fileExists(atPath: $0) }
+                let beforeSizes = Self.batchSizesForPaths(dbs)
+                let beforeTotal = beforeSizes.values.reduce(0, +)
+                for db in dbs {
                     let escaped = db.replacingOccurrences(of: "\"", with: "\\\"")
                     _ = Self.runShell("sqlite3 \"\(escaped)\" 'VACUUM;' 2>/dev/null")
                 }
+                let afterSizes = Self.batchSizesForPaths(dbs)
+                let afterTotal = afterSizes.values.reduce(0, +)
+                return max(0, beforeTotal - afterTotal)
             case "QL_RESET":
                 _ = Self.runShell("qlmanage -r cache 2>/dev/null")
+                return 0
             case "APFS_THIN":
                 _ = Self.runShell("tmutil thinlocalsnapshots / 10000000000 4 2>/dev/null")
+                return 0
             case "CLEAN_PATH":
                 if let p = item.targetPath {
+                    let initial = Self.batchSizesForPaths([p])[p] ?? item.sizeBytes
                     if (try? fm.trashItem(at: URL(fileURLWithPath: p), resultingItemURL: nil)) == nil {
                         try? fm.removeItem(atPath: p)
                     }
+                    let remaining = fm.fileExists(atPath: p) ? (Self.batchSizesForPaths([p])[p] ?? 0) : 0
+                    return max(0, initial - remaining)
                 }
+                return 0
             default:
-                break
+                return 0
             }
         }.value
 
-        if item.sizeBytes > 0 {
-            recordFreedSpace(item.sizeBytes)
+        if actualFreedBytes > 0 {
+            recordFreedSpace(actualFreedBytes)
         }
         appendLog("Optimización completada: \(item.title)", detail: item.technicalDetail, level: .success)
         lastStatusMessage = "Optimización '\(item.title)' completada exitosamente."

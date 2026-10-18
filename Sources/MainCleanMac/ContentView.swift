@@ -664,8 +664,10 @@ struct DashboardView: View {
                             }
                         } label: {
                             HStack(spacing: 8) {
-                                Image(systemName: "sparkles")
-                                Text("Limpiar \(ByteFormatter.string(from: scanner.quickSafeCleanableBytes))")
+                                Image(systemName: scanner.quickSafeCleanableBytes > 0 ? "sparkles" : "checkmark.circle.fill")
+                                Text(scanner.quickSafeCleanableBytes > 0
+                                     ? "Limpiar \(ByteFormatter.string(from: scanner.quickSafeCleanableBytes))"
+                                     : "Cachés Seguras Limpias")
                                     .font(.system(size: 14, weight: .bold))
                             }
                             .frame(maxWidth: .infinity)
@@ -675,7 +677,7 @@ struct DashboardView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(MainCleanTheme.emeraldSafe)
                         .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.08))
-                        .disabled(scanner.isExecutingOperation)
+                        .disabled(scanner.isExecutingOperation || scanner.quickSafeCleanableBytes <= 0)
                     }
                     .padding(22)
                     .frame(maxWidth: .infinity)
@@ -766,8 +768,10 @@ struct DashboardView: View {
                             }
                         } label: {
                             HStack(spacing: 8) {
-                                Image(systemName: "flame.fill")
-                                Text("Liberar \(ByteFormatter.string(from: scanner.deepSystemCleanableBytes))")
+                                Image(systemName: scanner.deepSystemCleanableBytes > 0 ? "flame.fill" : "checkmark.circle.fill")
+                                Text(scanner.deepSystemCleanableBytes > 0
+                                     ? "Liberar \(ByteFormatter.string(from: scanner.deepSystemCleanableBytes))"
+                                     : "Datos del Sistema Optimizados")
                                     .font(.system(size: 14, weight: .bold))
                             }
                             .frame(maxWidth: .infinity)
@@ -777,7 +781,7 @@ struct DashboardView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(MainCleanTheme.amberCaution)
                         .foregroundStyle(Color(red: 0.12, green: 0.07, blue: 0.01))
-                        .disabled(scanner.isExecutingOperation)
+                        .disabled(scanner.isExecutingOperation || scanner.deepSystemCleanableBytes <= 0)
                     }
                     .padding(22)
                     .frame(maxWidth: .infinity)

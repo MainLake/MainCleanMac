@@ -201,4 +201,85 @@ final class MainCleanMacTests: XCTestCase {
         XCTAssertEqual(app.leftoversSizeBytes, 500)
         XCTAssertEqual(app.totalSizeBytes, 1500)
     }
+
+    // MARK: - 6. Real Storage Calculations & Cleanable Bytes Accuracy
+    @MainActor
+    func testQuickSafeCleanableBytesExcludesMSeriesAndCaution() {
+        let scanner = SystemScannerService()
+
+        // Safe cache (should be counted)
+        let safeCache = CleanableItem(
+            name: "Chrome Cache",
+            description: "Caché",
+            impactNote: "Nota",
+            path: "/tmp/chrome",
+            category: .browsersAndApps,
+            safety: .safe,
+            sizeBytes: 500_000_000,
+            isSelected: true
+        )
+        // Caution cache (should NOT be counted in quick safe)
+        let cautionCache = CleanableItem(
+            name: "Papelera",
+            description: "Basurero",
+            impactNote: "Nota",
+            path: "/tmp/trash",
+            category: .systemAndGeneral,
+            safety: .caution,
+            sizeBytes: 100_000_000,
+            isSelected: false
+        )
+        scanner.cacheItems = [safeCache, cautionCache]
+
+        // Safe internal surgical cache (should be counted)
+        let safeSurgical = SurgicalPurgeItem(
+            title: "Chrome GPUCache",
+            parentAppOrContext: "Chrome",
+            whatIsPreserved: "Caché",
+            path: "/tmp/gpucache",
+            category: .appSupportSurgery,
+            sizeBytes: 200_000_000,
+            safety: .safe,
+            isSelected: true
+        )
+        scanner.surgicalItems = [safeSurgical]
+
+        // MSeries item (QuickLook reset or Darwin user cache - MUST NOT be in quickSafeCleanableBytes)
+        let mSeriesItem = MSeriesDeepItem(
+            identifier: "darwin_quicklook_cache",
+            title: "Reiniciar QuickLook",
+            subtitle: "Daemon",
+            technicalDetail: "qlmanage -r cache",
+            kind: .apfsSnapshotsAndSwap,
+            sizeBytes: 1_700_000_000,
+            safety: .safe,
+            actionButtonTitle: "Reiniciar",
+            actionCode: "QL_RESET",
+            targetPath: nil
+        )
+        scanner.mSeriesItems = [mSeriesItem]
+
+        // quickSafeCleanableBytes must ONLY be 500 MB + 200 MB = 700 MB (never +1.7 GB!)
+        XCTAssertEqual(scanner.quickSafeCleanableBytes, 700_000_000)
+    }
+
+    @MainActor
+    func testDiskOverviewUsesRealFilesystemFreeBytes() {
+        let scanner = SystemScannerService()
+        scanner.refreshDiskOverview()
+
+        let initialFree = scanner.diskOverview.freeBytes
+        XCTAssertGreaterThan(initialFree, 0)
+
+        // Record a simulated freed space of 50 GB
+        scanner.recordFreedSpace(50 * 1024 * 1024 * 1024)
+        XCTAssertEqual(scanner.sessionFreedBytes, 50 * 1024 * 1024 * 1024)
+
+        // Refresh disk overview: freeBytes must still be real filesystem data, not initialFree + 50 GB
+        scanner.refreshDiskOverview()
+        let freeAfter = scanner.diskOverview.freeBytes
+
+        // Must not be inflated by 50 GB
+        XCTAssertLessThan(abs(freeAfter - initialFree), 5 * 1024 * 1024 * 1024)
+    }
 }
