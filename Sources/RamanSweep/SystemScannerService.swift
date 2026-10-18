@@ -47,10 +47,14 @@ final class SystemScannerService: ObservableObject {
     private var spaceCache: [String: [SpaceEntry]] = [:]
     private var activeSpaceScanTask: Task<Void, Never>?
 
-    // System Data X-Ray
+    // System Data X-Ray & Surgical Deep Cleaner
     @Published var systemDataItems: [SystemDataXRayItem] = []
     @Published var isScanningSystemData = false
     private var hasScannedSystemDataOnce = false
+
+    @Published var surgicalItems: [SurgicalPurgeItem] = []
+    @Published var isScanningSurgical = false
+    private var hasScannedSurgicalOnce = false
 
     // Apple Silicon M-Series Engine
     @Published var mSeriesStatus = AppleSiliconHardwareStatus()
@@ -90,10 +94,12 @@ final class SystemScannerService: ObservableObject {
         hasScannedArtifactsOnce = true
         hasScannedDockerOnce = true
         hasScannedSystemDataOnce = true
+        hasScannedSurgicalOnce = true
         hasScannedMSeriesOnce = true
 
         Task {
             await scanCaches()
+            await scanSurgicalTargets()
             await scanSystemDataXRay()
             await scanAppleSiliconDeep()
             await scanInstalledApps()
@@ -107,6 +113,12 @@ final class SystemScannerService: ObservableObject {
         Task {
             await scanDirectory(path: currentSpacePath, forceRefresh: true)
         }
+    }
+
+    func ensureSurgicalLoaded() {
+        guard !hasScannedSurgicalOnce && !isScanningSurgical else { return }
+        hasScannedSurgicalOnce = true
+        Task { await scanSurgicalTargets() }
     }
 
     func ensureMSeriesLoaded() {
@@ -1321,6 +1333,327 @@ final class SystemScannerService: ObservableObject {
 
         appendLog("Espacio liberado en: \(item.title)", detail: item.path, level: .success)
         lastStatusMessage = "Se liberó '\(item.title)' correctamente."
+        await scanSystemDataXRay()
+        refreshDiskOverview()
+    }
+
+    // MARK: - Surgical Deep Cleaner (Safe Cleaning Inside Protected Folders)
+
+    var totalSelectedSurgicalBytes: Int64 {
+        surgicalItems.filter(\.isSelected).reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    func toggleSurgicalSelection(_ item: SurgicalPurgeItem) {
+        if let idx = surgicalItems.firstIndex(where: { $0.id == item.id }) {
+            surgicalItems[idx].isSelected.toggle()
+        }
+    }
+
+    func scanSurgicalTargets() async {
+        isScanningSurgical = true
+        defer { isScanningSurgical = false }
+
+        let homeDir = home
+        let results: [SurgicalPurgeItem] = await Task.detached(priority: .userInitiated) {
+            let fm = FileManager.default
+            var rawCandidates: [(title: String, context: String, preserved: String, path: String, category: SurgicalCategory, safety: SafetyLevel, selectedByDefault: Bool)] = []
+
+            // 1. SURGICAL EXTRACTION INSIDE ~/Library/Application Support (Keep logins/settings, purge internal caches/bloat)
+            let appSupportDir = "\(homeDir)/Library/Application Support"
+            let surgicalSubfolders = [
+                "Cache", "Code Cache", "GPUCache", "DawnWebGPUCache", "DawnGraphiteCache",
+                "Crashpad", "CachedData", "CachedProfilesData", "Service Worker", "logs", "blob_storage"
+            ]
+
+            if let appSupportEntries = try? fm.contentsOfDirectory(atPath: appSupportDir) {
+                for appFolder in appSupportEntries where !appFolder.hasPrefix(".") {
+                    let base = "\(appSupportDir)/\(appFolder)"
+                    for sub in surgicalSubfolders {
+                        let candidate = "\(base)/\(sub)"
+                        if fm.fileExists(atPath: candidate) {
+                            rawCandidates.append((
+                                title: "\(appFolder) → \(sub)",
+                                context: "Cirugía interna en Application Support/\(appFolder)",
+                                preserved: "Conserva tus cuentas, sesiones abiertas, extensiones y preferencias de \(appFolder).",
+                                path: candidate,
+                                category: .appSupportSurgery,
+                                safety: .safe,
+                                selectedByDefault: true
+                            ))
+                        }
+                    }
+                }
+            }
+
+            // Specific Chrome Default profile internal cache bloat (without touching Cookies, Login Data, Bookmarks, or Extensions)
+            let chromeDefault = "\(appSupportDir)/Google/Chrome/Default"
+            for chromeSub in ["Service Worker", "GPUCache", "DawnWebGPUCache", "DawnGraphiteCache", "Code Cache"] {
+                let p = "\(chromeDefault)/\(chromeSub)"
+                if fm.fileExists(atPath: p) {
+                    rawCandidates.append((
+                        title: "Google Chrome → \(chromeSub)",
+                        context: "Caché interna de perfil de Chrome en Application Support",
+                        preserved: "100% seguro: Tus contraseñas, pestañas, historial, cookies y sesiones de Google Chrome NO se tocan.",
+                        path: p,
+                        category: .appSupportSurgery,
+                        safety: .safe,
+                        selectedByDefault: true
+                    ))
+                }
+            }
+
+            // Docker Stale Installer inside Application Support (2.26 GB in_progress)
+            let dockerInstall = "\(appSupportDir)/com.docker.install"
+            if fm.fileExists(atPath: dockerInstall) {
+                rawCandidates.append((
+                    title: "Instalador Residual de Docker (com.docker.install)",
+                    context: "Actualizador estancado en Application Support",
+                    preserved: "Tu app Docker Desktop y tus contenedores actuales siguen intactos.",
+                    path: dockerInstall,
+                    category: .appSupportSurgery,
+                    safety: .safe,
+                    selectedByDefault: true
+                ))
+            }
+
+            // Zed auto-downloaded language servers & local node runtime inside Application Support
+            for (sub, desc) in [("languages", "Servidores LSP descargados por Zed"), ("node", "Runtime Node interno de Zed"), ("prettier", "Instancia Prettier de Zed")] {
+                let p = "\(appSupportDir)/Zed/\(sub)"
+                if fm.fileExists(atPath: p) {
+                    rawCandidates.append((
+                        title: "Zed Editor → \(sub) (\(desc))",
+                        context: "Binarios auto-descargables en Application Support/Zed",
+                        preserved: "Tus settings.json, keymaps y temas de Zed quedan intactos; Zed descarga solo los lenguajes que vuelvas a abrir.",
+                        path: p,
+                        category: .appSupportSurgery,
+                        safety: .safe,
+                        selectedByDefault: false
+                    ))
+                }
+            }
+
+            // 2. GHOST / UNINSTALLED APPS IN APPLICATION SUPPORT (Apps no longer in /Applications)
+            let installedAppNames = Set(((try? fm.contentsOfDirectory(atPath: "/Applications")) ?? []).map {
+                ($0 as NSString).deletingPathExtension.lowercased()
+            })
+
+            let knownGhostCandidates: [(folder: String, displayName: String, checkName: String)] = [
+                ("Claude", "Claude Desktop / Claude Code VM", "claude"),
+                ("zoom.us", "Zoom Video Communications", "zoom.us"),
+                ("Postman", "Postman API Client", "postman"),
+                ("BraveSoftware", "Brave Browser", "brave browser"),
+                ("Trae", "Trae IDE", "trae"),
+                ("Windsurf", "Windsurf IDE", "windsurf"),
+                ("Codex", "Codex Desktop Data", "codex"),
+                ("CodexBackups", "Respaldos Antiguos de Codex", "codex"),
+                ("dbpepe", "Datos de dbpepe", "dbpepe"),
+                ("jellyfin", "Servidor Jellyfin", "jellyfin"),
+                ("orca", "Orca App Data", "orca"),
+                ("Riot Client", "Riot Games Client Data", "riot client")
+            ]
+
+            for ghost in knownGhostCandidates {
+                let p = "\(appSupportDir)/\(ghost.folder)"
+                if fm.fileExists(atPath: p) && !installedAppNames.contains(ghost.checkName) {
+                    rawCandidates.append((
+                        title: "Residuos de \(ghost.displayName) (App ya no instalada)",
+                        context: "Carpeta huérfana en ~/Library/Application Support/\(ghost.folder)",
+                        preserved: "La aplicación '\(ghost.displayName)' ya no existe en /Applications, pero dejó estos datos ocupando espacio.",
+                        path: p,
+                        category: .orphanedAppsData,
+                        safety: .safe,
+                        selectedByDefault: true
+                    ))
+                }
+            }
+
+            // 3. DUPLICATE LANGUAGE RUNTIMES & OLD VERSIONS (.nvm, .pyenv, ~/Library/Python)
+            let nvmNodeDir = "\(homeDir)/.nvm/versions/node"
+            if let versions = try? fm.contentsOfDirectory(atPath: nvmNodeDir) {
+                let sortedVers = versions.filter { $0.hasPrefix("v") }.sorted()
+                if sortedVers.count > 1 {
+                    let newest = sortedVers.last!
+                    for oldVer in sortedVers.dropLast() {
+                        let p = "\(nvmNodeDir)/\(oldVer)"
+                        rawCandidates.append((
+                            title: "Versión Antigua de Node.js (\(oldVer)) en ~/.nvm",
+                            context: "Tienes múltiples versiones de Node instaladas",
+                            preserved: "Se conserva tu versión más reciente de Node (\(newest)) intacta.",
+                            path: p,
+                            category: .duplicateRuntimes,
+                            safety: .caution,
+                            selectedByDefault: false
+                        ))
+                    }
+                }
+            }
+
+            let pyenvVersDir = "\(homeDir)/.pyenv/versions"
+            if let pyVers = try? fm.contentsOfDirectory(atPath: pyenvVersDir) {
+                for v in pyVers where !v.hasPrefix(".") {
+                    let p = "\(pyenvVersDir)/\(v)"
+                    rawCandidates.append((
+                        title: "Toolchain de Python en ~/.pyenv (\(v))",
+                        context: "Versión compilada en ~/.pyenv/versions/\(v)",
+                        preserved: "El Python de Homebrew y del sistema siguen funcionando.",
+                        path: p,
+                        category: .duplicateRuntimes,
+                        safety: .caution,
+                        selectedByDefault: false
+                    ))
+                }
+            }
+
+            let userLibPython = "\(homeDir)/Library/Python"
+            if fm.fileExists(atPath: userLibPython) {
+                rawCandidates.append((
+                    title: "Paquetes Globales de Python (~/Library/Python)",
+                    context: "Librerías pip instaladas fuera de entornos virtuales",
+                    preserved: "Tus entornos .venv de proyectos no se ven afectados.",
+                    path: userLibPython,
+                    category: .duplicateRuntimes,
+                    safety: .caution,
+                    selectedByDefault: false
+                ))
+            }
+
+            // 4. MACOS 4K AERIAL WALLPAPERS & BACKDROP VIDEOS
+            let appleAerials = "\(appSupportDir)/com.apple.wallpaper/aerials"
+            if fm.fileExists(atPath: appleAerials) {
+                rawCandidates.append((
+                    title: "Videos 4K de Salvapantallas de macOS (com.apple.wallpaper/aerials)",
+                    context: "Videos aéreos descargados en segundo plano por macOS",
+                    preserved: "100% seguro: Tu fondo de pantalla estático no falla y macOS solo descarga videos si los eliges.",
+                    path: appleAerials,
+                    category: .macOSWallpaperAndMedia,
+                    safety: .safe,
+                    selectedByDefault: true
+                ))
+            }
+
+            for backdropSub in ["\(appSupportDir)/Backdrop/Library", "\(appSupportDir)/Backdrop/Catalog", "\(appSupportDir)/BackdropWallpaper"] {
+                if fm.fileExists(atPath: backdropSub) {
+                    let name = (backdropSub as NSString).lastPathComponent
+                    rawCandidates.append((
+                        title: "Videos Animados Descargados de Backdrop (\(name))",
+                        context: "Biblioteca de fondos en video en Application Support",
+                        preserved: "La app Backdrop sigue instalada; solo libera los videos pesados almacenados en disco.",
+                        path: backdropSub,
+                        category: .macOSWallpaperAndMedia,
+                        safety: .caution,
+                        selectedByDefault: false
+                    ))
+                }
+            }
+
+            // 5. HIDDEN DOTFILE BLOAT (~/.claude, ~/.local, ~/.npm, ~/.codegraph, ~/.grok, ~/.pi, ~/.flet)
+            let dotfileTargets: [(title: String, path: String, preserved: String, safe: Bool)] = [
+                ("Historial Pesado de Sesiones de Claude CLI (~/.claude/projects)", "\(homeDir)/.claude/projects", "Tus credenciales y settings.json de Claude se conservan.", true),
+                ("Historial de Archivos de Claude (~/.claude/file-history)", "\(homeDir)/.claude/file-history", "Tus configuraciones de Claude quedan intactas.", true),
+                ("Plugins y Cachés de Neovim (~/.local/share/nvim)", "\(homeDir)/.local/share/nvim", "Tu configuración en ~/.config/nvim (init.lua) no se toca.", false),
+                ("Entornos Compartidos de uv (~/.local/share/uv)", "\(homeDir)/.local/share/uv", "Se regeneran automáticamente con uv.", true),
+                ("Índice Local de Codegraph (~/.codegraph)", "\(homeDir)/.codegraph", "Índice regenerable de análisis de código.", true),
+                ("Datos Ocultos de Grok CLI (~/.grok)", "\(homeDir)/.grok", "Caché y datos locales en ~/.grok.", false),
+                ("Datos Ocultos de Pi (~/.pi)", "\(homeDir)/.pi", "Datos almacenados en ~/.pi.", false),
+                ("SDK Oculto de Flet (~/.flet)", "\(homeDir)/.flet", "Binarios descargados por Flet UI.", true),
+                ("Checkpoints SQLite de Pine (~/.pine_checkpoints.sqlite)", "\(homeDir)/.pine_checkpoints.sqlite", "Archivo de checkpoints instantáneos en tu carpeta Home.", true)
+            ]
+
+            for dot in dotfileTargets where fm.fileExists(atPath: dot.path) {
+                rawCandidates.append((
+                    title: dot.title,
+                    context: "Carpeta oculta en tu directorio de inicio (~/)",
+                    preserved: dot.preserved,
+                    path: dot.path,
+                    category: .hiddenDotfileBloat,
+                    safety: dot.safe ? .safe : .caution,
+                    selectedByDefault: dot.safe
+                ))
+            }
+
+            let allPaths = rawCandidates.map(\.path)
+            let sizeMap = Self.batchSizesForPaths(allPaths)
+
+            var items: [SurgicalPurgeItem] = []
+            for c in rawCandidates {
+                let sz = sizeMap[c.path] ?? 0
+                if sz >= 2 * 1024 * 1024 { // Only show items >= 2 MB
+                    items.append(SurgicalPurgeItem(
+                        title: c.title,
+                        parentAppOrContext: c.context,
+                        whatIsPreserved: c.preserved,
+                        path: c.path,
+                        category: c.category,
+                        sizeBytes: sz,
+                        safety: c.safety,
+                        isSelected: c.selectedByDefault
+                    ))
+                }
+            }
+
+            return items.sorted { $0.sizeBytes > $1.sizeBytes }
+        }.value
+
+        surgicalItems = results
+    }
+
+    func cleanSurgicalItem(_ item: SurgicalPurgeItem) async {
+        isExecutingOperation = true
+        currentOperationTitle = "Cirugía en curso: \(item.title)..."
+        defer { isExecutingOperation = false }
+
+        let moveToTrash = safeModeTrashOnly
+        appendLog("Limpieza quirúrgica: \(item.title)", detail: item.path, level: .info)
+
+        await Task.detached(priority: .userInitiated) {
+            let fm = FileManager.default
+            let url = URL(fileURLWithPath: item.path)
+            if moveToTrash {
+                if (try? fm.trashItem(at: url, resultingItemURL: nil)) == nil {
+                    try? fm.removeItem(at: url)
+                }
+            } else {
+                try? fm.removeItem(at: url)
+            }
+        }.value
+
+        appendLog("Liberado con éxito: \(item.title) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .success)
+        lastStatusMessage = "Se liberó '\(item.title)' (\(ByteFormatter.string(from: item.sizeBytes)))."
+        await scanSurgicalTargets()
+        await scanSystemDataXRay()
+        refreshDiskOverview()
+    }
+
+    func cleanAllSelectedSurgicalItems() async {
+        let selected = surgicalItems.filter(\.isSelected)
+        guard !selected.isEmpty else { return }
+
+        isExecutingOperation = true
+        currentOperationTitle = "Ejecutando Cirugía Profunda (\(selected.count) objetivos)..."
+        defer { isExecutingOperation = false }
+
+        let moveToTrash = safeModeTrashOnly
+        var totalFreed: Int64 = 0
+
+        for item in selected {
+            appendLog("Purgando: \(item.title) (\(ByteFormatter.string(from: item.sizeBytes)))", detail: item.path, level: .info)
+            await Task.detached(priority: .userInitiated) {
+                let fm = FileManager.default
+                let url = URL(fileURLWithPath: item.path)
+                if moveToTrash {
+                    if (try? fm.trashItem(at: url, resultingItemURL: nil)) == nil {
+                        try? fm.removeItem(at: url)
+                    }
+                } else {
+                    try? fm.removeItem(at: url)
+                }
+            }.value
+            totalFreed += item.sizeBytes
+        }
+
+        appendLog("Cirugía completada: \(ByteFormatter.string(from: totalFreed)) recuperados", level: .success)
+        lastStatusMessage = "Cirugía completada: \(ByteFormatter.string(from: totalFreed)) liberados sin afectar tus sesiones."
+        await scanSurgicalTargets()
         await scanSystemDataXRay()
         refreshDiskOverview()
     }

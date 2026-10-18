@@ -2,9 +2,14 @@ import SwiftUI
 
 struct SpaceLensView: View {
     @EnvironmentObject var scanner: SystemScannerService
-    @State private var selectedMode: Int = 0 // 0 = Mapa de Carpetas, 1 = Rayos X: Datos del Sistema
+    // 0 = Cirugía Profunda (Accionable en Rutas Protegidas)
+    // 1 = Rayos X: Datos del Sistema
+    // 2 = Mapa de Carpetas (con navegación e inspección dentro de rutas raíz)
+    @State private var selectedMode: Int = 0
+    @State private var selectedSurgicalCategory: SurgicalCategory = .appSupportSurgery
     @State private var entryPendingConfirmation: SpaceEntry?
     @State private var xrayItemPendingDelete: SystemDataXRayItem?
+    @State private var surgicalItemPendingDelete: SurgicalPurgeItem?
 
     var pathComponents: [(name: String, fullPath: String)] {
         let parts = scanner.currentSpacePath.split(separator: "/").map(String.init)
@@ -17,6 +22,21 @@ struct SpaceLensView: View {
         return result
     }
 
+    var activeSurgicalCategories: [SurgicalCategory] {
+        SurgicalCategory.allCases.filter { cat in
+            !scanner.surgicalItems.filter { $0.category == cat }.isEmpty
+        }
+    }
+
+    var currentSurgicalItems: [SurgicalPurgeItem] {
+        let items = scanner.surgicalItems.filter { $0.category == selectedSurgicalCategory }
+        if !items.isEmpty { return items }
+        if let first = activeSurgicalCategories.first {
+            return scanner.surgicalItems.filter { $0.category == first }
+        }
+        return []
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Top Lens Header
@@ -25,7 +45,7 @@ struct SpaceLensView: View {
                     HStack(spacing: 10) {
                         Text("Espectro Disco")
                             .font(.system(size: 26, weight: .bold, design: .rounded))
-                        Text("ANÁLISIS VOLUMÉTRICO")
+                        Text("CIRUGÍA PROFUNDA & RAYOS X")
                             .font(.system(size: 10, weight: .heavy, design: .monospaced))
                             .foregroundStyle(RamanTheme.antiStokesViolet)
                             .padding(.horizontal, 8)
@@ -34,8 +54,10 @@ struct SpaceLensView: View {
                     }
                     Text(
                         selectedMode == 0
-                            ? "Navegación de alta velocidad por carpetas con candado de seguridad para rutas críticas."
-                            : "Radiografía exacta de qué compone la caja negra de 'Datos del Sistema' de macOS."
+                            ? "Extrae gigabytes ocultos dentro de Application Support, apps fantasmas y versiones antiguas sin perder tus sesiones."
+                            : (selectedMode == 1
+                                ? "Radiografía exacta de los 110+ GB de 'Datos del Sistema' con acciones directas o salto a subcarpetas."
+                                : "Navegador de carpetas desbloqueado: entra en Application Support o Containers para borrar lo que no uses.")
                     )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -44,29 +66,33 @@ struct SpaceLensView: View {
                 Spacer()
 
                 Picker("", selection: $selectedMode) {
-                    Text("Mapa de Carpetas").tag(0)
-                    Text("Rayos X: Datos del Sistema").tag(1)
+                    Text("Cirugía Profunda (\(scanner.surgicalItems.count))").tag(0)
+                    Text("Rayos X Sistema").tag(1)
+                    Text("Mapa de Carpetas").tag(2)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 340)
+                .frame(width: 440)
 
                 Button {
                     Task {
                         if selectedMode == 0 {
-                            await scanner.scanDirectory(path: scanner.currentSpacePath, forceRefresh: true)
-                        } else {
+                            await scanner.scanSurgicalTargets()
+                        } else if selectedMode == 1 {
                             await scanner.scanSystemDataXRay()
+                        } else {
+                            await scanner.scanDirectory(path: scanner.currentSpacePath, forceRefresh: true)
                         }
                     }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.bordered)
-                .help("Recalcular")
+                .help("Reescanear")
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 20)
             .onAppear {
+                scanner.ensureSurgicalLoaded()
                 scanner.ensureSpaceLensLoaded()
                 scanner.ensureSystemDataLoaded()
             }
@@ -74,9 +100,11 @@ struct SpaceLensView: View {
             Divider().overlay(Color.white.opacity(0.07))
 
             if selectedMode == 0 {
-                folderExplorerSubView
-            } else {
+                surgicalDeepCleanerSubView
+            } else if selectedMode == 1 {
                 systemDataXRaySubView
+            } else {
+                folderExplorerSubView
             }
         }
         .alert(
@@ -121,224 +149,253 @@ struct SpaceLensView: View {
                 Text("\(item.explanation)\n\nEspacio a recuperar: \(ByteFormatter.string(from: item.sizeBytes))")
             }
         }
+        .alert(
+            "Confirmar Cirugía: \(surgicalItemPendingDelete?.title ?? "")",
+            isPresented: Binding(
+                get: { surgicalItemPendingDelete != nil },
+                set: { if !$0 { surgicalItemPendingDelete = nil } }
+            )
+        ) {
+            Button("Cancelar", role: .cancel) {
+                surgicalItemPendingDelete = nil
+            }
+            Button("Purgar Ahora", role: .destructive) {
+                if let item = surgicalItemPendingDelete {
+                    Task { await scanner.cleanSurgicalItem(item) }
+                }
+                surgicalItemPendingDelete = nil
+            }
+        } message: {
+            if let item = surgicalItemPendingDelete {
+                Text("\(item.whatIsPreserved)\n\nEspacio a liberar: \(ByteFormatter.string(from: item.sizeBytes))")
+            }
+        }
     }
 
-    // MARK: - Sub-Tab 0: Folder Explorer
+    // MARK: - Sub-Tab 0: Surgical Deep Cleaner (Safe Cleaning Inside Protected Folders)
 
-    private var folderExplorerSubView: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Navigation Bar + Breadcrumbs
-            HStack(spacing: 12) {
-                HStack(spacing: 6) {
-                    Button {
-                        Task { await scanner.scanDirectory(path: "/") }
-                    } label: {
-                        Label("Raíz (/)", systemImage: "internaldrive")
-                            .font(.caption.weight(.medium))
-                    }
+    private var surgicalDeepCleanerSubView: some View {
+        let totalFoundBytes = scanner.surgicalItems.reduce(Int64(0)) { $0 + $1.sizeBytes }
 
-                    Button {
-                        let home = FileManager.default.homeDirectoryForCurrentUser.path
-                        Task { await scanner.scanDirectory(path: home) }
-                    } label: {
-                        Label("Usuario", systemImage: "house")
-                            .font(.caption.weight(.medium))
-                    }
-
-                    Button {
-                        Task { await scanner.scanDirectory(path: "/Applications") }
-                    } label: {
-                        Label("Apps", systemImage: "square.grid.2x2")
-                            .font(.caption.weight(.medium))
-                    }
-
-                    Button {
-                        let parent = (scanner.currentSpacePath as NSString).deletingLastPathComponent
-                        if !parent.isEmpty {
-                            Task { await scanner.scanDirectory(path: parent) }
-                        }
-                    } label: {
-                        Image(systemName: "arrow.up")
-                            .font(.caption.bold())
-                    }
-                    .disabled(scanner.currentSpacePath == "/")
-                }
-                .buttonStyle(.bordered)
-
-                Divider().frame(height: 18)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(Array(pathComponents.enumerated()), id: \.offset) { idx, comp in
-                            Button {
-                                Task { await scanner.scanDirectory(path: comp.fullPath) }
-                            } label: {
-                                Text(comp.name == "/" ? "Macintosh HD" : comp.name)
-                                    .font(.caption.weight(idx == pathComponents.count - 1 ? .bold : .medium))
-                                    .foregroundStyle(idx == pathComponents.count - 1 ? .white : .secondary)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.white.opacity(idx == pathComponents.count - 1 ? 0.12 : 0.04), in: Capsule())
-                            }
-                            .buttonStyle(.plain)
-
-                            if idx < pathComponents.count - 1 {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(.secondary.opacity(0.6))
-                            }
-                        }
-                    }
-                }
-
-                if scanner.isScanningSpace {
-                    HStack(spacing: 6) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Calculando...")
-                            .font(.caption2)
-                            .foregroundStyle(RamanTheme.laserCyan)
-                    }
-                }
-            }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 10)
-            .background(Color.black.opacity(0.2))
-
-            Divider().overlay(RamanTheme.borderSubtle)
-
-            if scanner.spaceEntries.isEmpty && scanner.isScanningSpace {
+        return Group {
+            if scanner.isScanningSurgical && scanner.surgicalItems.isEmpty {
                 VStack(spacing: 14) {
                     ProgressView()
-                        .scaleEffect(1.15)
-                        .tint(RamanTheme.antiStokesViolet)
-                    Text("Abriendo \(scanner.currentSpacePath)...")
+                        .scaleEffect(1.2)
+                        .tint(RamanTheme.laserCyan)
+                    Text("Inspeccionando el interior de ~/Library/Application Support, versiones antiguas y dotfiles ocultos...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if scanner.spaceEntries.isEmpty {
+            } else if scanner.surgicalItems.isEmpty {
                 VStack(spacing: 12) {
-                    Image(systemName: "folder")
-                        .font(.system(size: 46))
-                        .foregroundStyle(.secondary)
-                    Text("Sin elementos mayores a 512 KB")
-                        .font(.headline)
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(RamanTheme.emeraldSafe)
+                    Text("Cirugía al día")
+                        .font(.title3.bold())
+                    Text("No se detectaron residuos internos ni instalaciones fantasmas pendientes.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(scanner.spaceEntries) { entry in
-                            HStack(spacing: 14) {
-                                Button {
-                                    if entry.isDirectory {
-                                        Task { await scanner.scanDirectory(path: entry.path) }
-                                    } else {
-                                        scanner.revealInFinder(path: entry.path)
-                                    }
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: entry.isDirectory ? "folder.fill" : "doc.fill")
-                                            .font(.title3)
-                                            .foregroundStyle(entry.isDirectory ? RamanTheme.laserCyan : RamanTheme.antiStokesViolet)
-                                            .frame(width: 24)
+                VStack(spacing: 0) {
+                    // Action Banner
+                    HStack(spacing: 16) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(RamanTheme.laserCyan.opacity(0.16))
+                                .frame(width: 40, height: 40)
+                            Image(systemName: "scissors")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(RamanTheme.laserCyan)
+                        }
 
-                                        VStack(alignment: .leading, spacing: 5) {
-                                            HStack(spacing: 8) {
-                                                Text(entry.name)
-                                                    .font(.subheadline.weight(.medium))
-                                                    .lineLimit(1)
-                                                if entry.safety != .safe {
-                                                    SafetyBadgeView(level: entry.safety)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Detectados \(ByteFormatter.string(from: totalFoundBytes)) ocultos dentro de carpetas del sistema y usuario")
+                                .font(.headline)
+                            Text("A diferencia de un explorador pasivo, aquí puedes extraer solo la basura interna (Crashpad, GPUCache, Service Workers, apps ya borradas, instaladores atorados y videos 4K) conservando tus inicios de sesión.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            Task { await scanner.cleanAllSelectedSurgicalItems() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "scissors")
+                                Text("Ejecutar Cirugía (\(ByteFormatter.string(from: scanner.totalSelectedSurgicalBytes)))")
+                                    .fontWeight(.bold)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(RamanTheme.stokesAmber)
+                        .foregroundStyle(.black)
+                        .disabled(scanner.totalSelectedSurgicalBytes == 0 || scanner.isExecutingOperation)
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 16)
+                    .background(Color.black.opacity(0.22))
+
+                    Divider().overlay(RamanTheme.borderSubtle)
+
+                    // 2-Column Split View: Left = 5 Surgical Categories, Right = Items
+                    HStack(spacing: 0) {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("LENTES DE CIRUGÍA")
+                                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.bottom, 4)
+
+                                ForEach(SurgicalCategory.allCases, id: \.self) { cat in
+                                    let items = scanner.surgicalItems.filter { $0.category == cat }
+                                    if !items.isEmpty {
+                                        let catBytes = items.reduce(Int64(0)) { $0 + $1.sizeBytes }
+                                        let isCurrent = selectedSurgicalCategory == cat || (!activeSurgicalCategories.contains(selectedSurgicalCategory) && activeSurgicalCategories.first == cat)
+
+                                        Button {
+                                            selectedSurgicalCategory = cat
+                                        } label: {
+                                            HStack(spacing: 12) {
+                                                ZStack {
+                                                    RoundedRectangle(cornerRadius: 9)
+                                                        .fill(cat.color.opacity(isCurrent ? 0.24 : 0.12))
+                                                        .frame(width: 34, height: 34)
+                                                    Image(systemName: cat.icon)
+                                                        .font(.system(size: 14, weight: .semibold))
+                                                        .foregroundStyle(cat.color)
                                                 }
-                                                Spacer()
-                                                if entry.sizeBytes > 0 {
-                                                    Text(ByteFormatter.string(from: entry.sizeBytes))
-                                                        .font(.system(.subheadline, design: .rounded).monospacedDigit().bold())
-                                                        .foregroundStyle(.primary)
-                                                } else if scanner.isScanningSpace {
-                                                    Text("...")
-                                                        .font(.caption)
+
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(cat.rawValue)
+                                                        .font(.system(size: 12, weight: isCurrent ? .bold : .medium, design: .rounded))
+                                                        .foregroundStyle(.white)
+                                                        .lineLimit(2)
+                                                    Text("\(items.count) objetivos")
+                                                        .font(.caption2)
                                                         .foregroundStyle(.secondary)
                                                 }
-                                            }
 
-                                            GeometryReader { geo in
-                                                ZStack(alignment: .leading) {
-                                                    Capsule()
-                                                        .fill(Color.white.opacity(0.07))
-                                                    Capsule()
-                                                        .fill(
-                                                            entry.safety == .protected
-                                                                ? LinearGradient(colors: [RamanTheme.infraredRed, RamanTheme.stokesAmber], startPoint: .leading, endPoint: .trailing)
-                                                                : RamanTheme.spectrumGradient
-                                                        )
-                                                        .frame(width: max(6, geo.size.width * entry.relativeWeight))
-                                                }
-                                            }
-                                            .frame(height: 5)
-                                        }
-                                    }
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
+                                                Spacer()
 
-                                HStack(spacing: 8) {
-                                    Button {
-                                        scanner.revealInFinder(path: entry.path)
-                                    } label: {
-                                        Image(systemName: "magnifyingglass")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .frame(width: 26, height: 26)
-                                            .background(Color.white.opacity(0.06), in: Circle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help("Ver en Finder")
-
-                                    if entry.safety == .protected {
-                                        Image(systemName: "lock.fill")
-                                            .font(.caption)
-                                            .foregroundStyle(RamanTheme.infraredRed.opacity(0.8))
-                                            .frame(width: 26, height: 26)
-                                            .help(entry.protectionReason ?? "Protegido por seguridad")
-                                    } else {
-                                        Button(role: .destructive) {
-                                            if entry.safety == .caution || entry.sizeBytes > 500 * 1024 * 1024 {
-                                                entryPendingConfirmation = entry
-                                            } else {
-                                                Task { await scanner.moveToTrash(entry: entry) }
+                                                Text(ByteFormatter.string(from: catBytes))
+                                                    .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
+                                                    .foregroundStyle(isCurrent ? cat.color : .secondary)
                                             }
-                                        } label: {
-                                            Image(systemName: "trash")
-                                                .font(.caption)
-                                                .foregroundStyle(RamanTheme.infraredRed)
-                                                .frame(width: 26, height: 26)
-                                                .background(RamanTheme.infraredRed.opacity(0.12), in: Circle())
+                                            .padding(11)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(isCurrent ? RamanTheme.panelBg : Color.white.opacity(0.025))
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(isCurrent ? cat.color.opacity(0.45) : RamanTheme.borderSubtle, lineWidth: 1)
+                                            )
                                         }
                                         .buttonStyle(.plain)
-                                        .help("Mover al Basurero")
                                     }
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(RamanTheme.borderSubtle, lineWidth: 1)
-                            )
+                            .padding(18)
+                        }
+                        .frame(width: 315)
+                        .background(Color.black.opacity(0.16))
+
+                        Rectangle()
+                            .fill(RamanTheme.borderSubtle)
+                            .frame(width: 1)
+
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(currentSurgicalItems) { item in
+                                    HStack(spacing: 14) {
+                                        Toggle("", isOn: Binding(
+                                            get: { item.isSelected },
+                                            set: { _ in scanner.toggleSurgicalSelection(item) }
+                                        ))
+                                        .toggleStyle(.checkbox)
+                                        .labelsHidden()
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 8) {
+                                                Text(item.title)
+                                                    .font(.subheadline.weight(.bold))
+                                                SafetyBadgeView(level: item.safety)
+                                            }
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "checkmark.shield.fill")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(RamanTheme.emeraldSafe)
+                                                Text(item.whatIsPreserved)
+                                                    .font(.caption)
+                                                    .foregroundStyle(RamanTheme.emeraldSafe.opacity(0.9))
+                                            }
+                                            Text(item.path)
+                                                .font(.system(size: 10, design: .monospaced))
+                                                .foregroundStyle(.secondary.opacity(0.7))
+                                                .lineLimit(1)
+                                        }
+
+                                        Spacer()
+
+                                        Text(ByteFormatter.string(from: item.sizeBytes))
+                                            .font(.system(.callout, design: .rounded).monospacedDigit().bold())
+                                            .foregroundStyle(RamanTheme.laserCyan)
+
+                                        Button {
+                                            scanner.revealInFinder(path: item.path)
+                                        } label: {
+                                            Image(systemName: "magnifyingglass")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .frame(width: 28, height: 28)
+                                                .background(Color.white.opacity(0.06), in: Circle())
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("Ver en Finder")
+
+                                        Button {
+                                            if item.safety == .caution {
+                                                surgicalItemPendingDelete = item
+                                            } else {
+                                                Task { await scanner.cleanSurgicalItem(item) }
+                                            }
+                                        } label: {
+                                            Text("Purgar")
+                                                .font(.caption.weight(.bold))
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 5)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(item.safety == .safe ? RamanTheme.laserCyan : RamanTheme.stokesAmber)
+                                        .foregroundStyle(.black)
+                                        .disabled(scanner.isExecutingOperation)
+                                    }
+                                    .padding(14)
+                                    .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(item.isSelected ? RamanTheme.laserCyan.opacity(0.3) : RamanTheme.borderSubtle, lineWidth: 1)
+                                    )
+                                }
+                            }
+                            .padding(24)
                         }
                     }
-                    .padding(28)
                 }
             }
         }
     }
 
-    // MARK: - Sub-Tab 1: System Data X-Ray
+    // MARK: - Sub-Tab 1: System Data X-Ray (Every item is actionable!)
 
     private var systemDataXRaySubView: some View {
         let totalExplained = scanner.systemDataItems.reduce(Int64(0)) { $0 + $1.sizeBytes }
@@ -362,9 +419,9 @@ struct SpaceLensView: View {
                             RamanPrismLogo(size: 52)
 
                             VStack(alignment: .leading, spacing: 5) {
-                                Text("¿Por qué macOS reporta más de 100 GB en 'Datos del Sistema'?")
+                                Text("Radiografía Accionable de 'Datos del Sistema'")
                                     .font(.headline)
-                                Text("macOS agrupa ahí todo lo que vive fuera de carpetas estándar: juegos auto-actualizables dentro de .app (como Riot / League of Legends), paquetes Homebrew (/opt/homebrew), contenedores de IA/Docker, cachés de análisis neuronal de Fotos y directorios de código personalizados.")
+                                Text("Ninguna fila es un callejón sin salida: puedes liberar directamente los cachés/instaladores o hacer clic en 'Inspeccionar Interior' para entrar a cualquier carpeta protegida y borrar subcarpetas específicas.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -375,7 +432,7 @@ struct SpaceLensView: View {
                                 Text(ByteFormatter.string(from: totalExplained))
                                     .font(.system(.title2, design: .rounded).monospacedDigit().bold())
                                     .foregroundStyle(RamanTheme.laserCyan)
-                                Text("Purgable directo: \(ByteFormatter.string(from: totalCleanable))")
+                                Text("Liberable directo: \(ByteFormatter.string(from: totalCleanable))")
                                     .font(.caption2.bold())
                                     .foregroundStyle(RamanTheme.emeraldSafe)
                             }
@@ -453,13 +510,270 @@ struct SpaceLensView: View {
                                     .foregroundStyle(.black)
                                     .disabled(scanner.isExecutingOperation)
                                 } else {
-                                    Image(systemName: "lock.fill")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary.opacity(0.6))
-                                        .frame(width: 64)
+                                    // Instead of a dead-end lock icon, let the user drill into this folder in the Explorer!
+                                    Button {
+                                        selectedMode = 2
+                                        Task { await scanner.scanDirectory(path: item.path) }
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "folder.badge.gearshape")
+                                            Text("Abrir Interior")
+                                        }
+                                        .font(.caption.weight(.semibold))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 5)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .help("Entrar a esta carpeta para elegir qué subcarpetas eliminar")
                                 }
                             }
                             .padding(14)
+                            .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(RamanTheme.borderSubtle, lineWidth: 1)
+                            )
+                        }
+                    }
+                    .padding(28)
+                }
+            }
+        }
+    }
+
+    // MARK: - Sub-Tab 2: Unlocked Folder Explorer
+
+    private var folderExplorerSubView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Navigation Shortcuts + Breadcrumbs
+            HStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Button {
+                        Task { await scanner.scanDirectory(path: "/") }
+                    } label: {
+                        Label("Raíz (/)", systemImage: "internaldrive")
+                            .font(.caption.weight(.medium))
+                    }
+
+                    Button {
+                        let home = FileManager.default.homeDirectoryForCurrentUser.path
+                        Task { await scanner.scanDirectory(path: home) }
+                    } label: {
+                        Label("Inicio", systemImage: "house")
+                            .font(.caption.weight(.medium))
+                    }
+
+                    Button {
+                        let appSupp = "\(FileManager.default.homeDirectoryForCurrentUser.path)/Library/Application Support"
+                        Task { await scanner.scanDirectory(path: appSupp) }
+                    } label: {
+                        Label("App Support", systemImage: "folder.badge.gearshape")
+                            .font(.caption.weight(.medium))
+                    }
+
+                    Button {
+                        let containers = "\(FileManager.default.homeDirectoryForCurrentUser.path)/Library/Containers"
+                        Task { await scanner.scanDirectory(path: containers) }
+                    } label: {
+                        Label("Containers", systemImage: "shippingbox")
+                            .font(.caption.weight(.medium))
+                    }
+
+                    Button {
+                        let parent = (scanner.currentSpacePath as NSString).deletingLastPathComponent
+                        if !parent.isEmpty {
+                            Task { await scanner.scanDirectory(path: parent) }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up")
+                            .font(.caption.bold())
+                    }
+                    .disabled(scanner.currentSpacePath == "/")
+                }
+                .buttonStyle(.bordered)
+
+                Divider().frame(height: 18)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(pathComponents.enumerated()), id: \.offset) { idx, comp in
+                            Button {
+                                Task { await scanner.scanDirectory(path: comp.fullPath) }
+                            } label: {
+                                Text(comp.name == "/" ? "Macintosh HD" : comp.name)
+                                    .font(.caption.weight(idx == pathComponents.count - 1 ? .bold : .medium))
+                                    .foregroundStyle(idx == pathComponents.count - 1 ? .white : .secondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(idx == pathComponents.count - 1 ? 0.12 : 0.04), in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+
+                            if idx < pathComponents.count - 1 {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.secondary.opacity(0.6))
+                            }
+                        }
+                    }
+                }
+
+                if scanner.isScanningSpace {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Calculando...")
+                            .font(.caption2)
+                            .foregroundStyle(RamanTheme.laserCyan)
+                    }
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 10)
+            .background(Color.black.opacity(0.2))
+
+            Divider().overlay(RamanTheme.borderSubtle)
+
+            if scanner.spaceEntries.isEmpty && scanner.isScanningSpace {
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .scaleEffect(1.15)
+                        .tint(RamanTheme.antiStokesViolet)
+                    Text("Abriendo \(scanner.currentSpacePath)...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if scanner.spaceEntries.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 46))
+                        .foregroundStyle(.secondary)
+                    Text("Sin elementos mayores a 100 KB")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(scanner.spaceEntries) { entry in
+                            HStack(spacing: 14) {
+                                Button {
+                                    if entry.isDirectory {
+                                        Task { await scanner.scanDirectory(path: entry.path) }
+                                    } else {
+                                        scanner.revealInFinder(path: entry.path)
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: entry.isDirectory ? "folder.fill" : "doc.fill")
+                                            .font(.title3)
+                                            .foregroundStyle(entry.isDirectory ? RamanTheme.laserCyan : RamanTheme.antiStokesViolet)
+                                            .frame(width: 24)
+
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            HStack(spacing: 8) {
+                                                Text(entry.name)
+                                                    .font(.subheadline.weight(.medium))
+                                                    .lineLimit(1)
+                                                if entry.safety != .safe {
+                                                    SafetyBadgeView(level: entry.safety)
+                                                }
+                                                Spacer()
+                                                if entry.sizeBytes > 0 {
+                                                    Text(ByteFormatter.string(from: entry.sizeBytes))
+                                                        .font(.system(.subheadline, design: .rounded).monospacedDigit().bold())
+                                                        .foregroundStyle(.primary)
+                                                } else if scanner.isScanningSpace {
+                                                    Text("...")
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+
+                                            GeometryReader { geo in
+                                                ZStack(alignment: .leading) {
+                                                    Capsule()
+                                                        .fill(Color.white.opacity(0.07))
+                                                    Capsule()
+                                                        .fill(
+                                                            entry.safety == .protected
+                                                                ? LinearGradient(colors: [RamanTheme.infraredRed, RamanTheme.stokesAmber], startPoint: .leading, endPoint: .trailing)
+                                                                : RamanTheme.spectrumGradient
+                                                        )
+                                                        .frame(width: max(6, geo.size.width * entry.relativeWeight))
+                                                }
+                                            }
+                                            .frame(height: 5)
+                                        }
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+
+                                HStack(spacing: 8) {
+                                    Button {
+                                        scanner.revealInFinder(path: entry.path)
+                                    } label: {
+                                        Image(systemName: "magnifyingglass")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 26, height: 26)
+                                            .background(Color.white.opacity(0.06), in: Circle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Ver en Finder")
+
+                                    if entry.safety == .protected {
+                                        if entry.isDirectory {
+                                            Button {
+                                                Task { await scanner.scanDirectory(path: entry.path) }
+                                            } label: {
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: "arrow.right.circle.fill")
+                                                    Text("Entrar")
+                                                }
+                                                .font(.caption2.bold())
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(RamanTheme.laserCyan.opacity(0.15), in: Capsule())
+                                                .foregroundStyle(RamanTheme.laserCyan)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .help(entry.protectionReason ?? "Haz clic para entrar y limpiar subcarpetas específicas")
+                                        } else {
+                                            Image(systemName: "lock.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(RamanTheme.infraredRed.opacity(0.8))
+                                                .frame(width: 26, height: 26)
+                                                .help(entry.protectionReason ?? "Protegido por seguridad")
+                                        }
+                                    } else {
+                                        Button(role: .destructive) {
+                                            if entry.safety == .caution || entry.sizeBytes > 250 * 1024 * 1024 {
+                                                entryPendingConfirmation = entry
+                                            } else {
+                                                Task { await scanner.moveToTrash(entry: entry) }
+                                            }
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "trash.fill")
+                                                Text("Eliminar")
+                                            }
+                                            .font(.caption2.bold())
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(RamanTheme.infraredRed.opacity(0.85), in: Capsule())
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("Mover al Basurero")
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
                             .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)

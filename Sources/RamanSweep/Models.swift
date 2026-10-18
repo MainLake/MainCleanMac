@@ -277,9 +277,49 @@ enum ScheduleFrequency: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum SurgicalCategory: String, CaseIterable {
+    case appSupportSurgery = "Cirugía en Application Support (Sin perder sesiones)"
+    case orphanedAppsData = "Datos de Apps Ya Desinstaladas (Fantasmas)"
+    case duplicateRuntimes = "Versiones Duplicadas de Node / Python / Herramientas"
+    case macOSWallpaperAndMedia = "Videos 4K y Fondos Ocultos de macOS"
+    case hiddenDotfileBloat = "Cachés en Carpetas Ocultas (~/.claude, ~/.local, ~/.npm)"
+
+    var icon: String {
+        switch self {
+        case .appSupportSurgery: return "scissors"
+        case .orphanedAppsData: return "Theatermasks.fill"
+        case .duplicateRuntimes: return "square.stack.3d.up.badge.a.fill"
+        case .macOSWallpaperAndMedia: return "film.stack.fill"
+        case .hiddenDotfileBloat: return "eye.trianglebadge.exclamationmark.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .appSupportSurgery: return RamanTheme.laserCyan
+        case .orphanedAppsData: return RamanTheme.stokesAmber
+        case .duplicateRuntimes: return RamanTheme.antiStokesViolet
+        case .macOSWallpaperAndMedia: return .pink
+        case .hiddenDotfileBloat: return RamanTheme.emeraldSafe
+        }
+    }
+}
+
+struct SurgicalPurgeItem: Identifiable, Hashable {
+    var id: String { path }
+    let title: String
+    let parentAppOrContext: String
+    let whatIsPreserved: String
+    let path: String
+    let category: SurgicalCategory
+    let sizeBytes: Int64
+    let safety: SafetyLevel
+    var isSelected: Bool = true
+}
+
 enum SafetyGuard {
     static let protectedExactOrPrefixPaths: [(prefix: String, reason: String)] = [
-        ("/System", "Sistema operativo macOS protegido."),
+        ("/System", "Sistema operativo macOS protegido por SIP."),
         ("/bin", "Binarios esenciales del sistema."),
         ("/sbin", "Binarios de administración del sistema."),
         ("/usr/bin", "Herramientas base del sistema."),
@@ -290,8 +330,20 @@ enum SafetyGuard {
     ]
 
     static func evaluate(path: String, home: String) -> (SafetyLevel, String?) {
-        if path == "/Library" || path == "\(home)/Library" || path == home || path == "/Users" || path == "/Applications" {
-            return (.protected, "Carpeta raíz estructural de macOS. Entra en ella para inspeccionar subcarpetas específicas.")
+        // Structural root containers cannot be deleted as a whole, but their children CAN be inspected and deleted!
+        let structuralRoots: Set<String> = [
+            "/", "/Users", "/Applications", "/Library",
+            home,
+            "\(home)/Library",
+            "\(home)/Library/Application Support",
+            "\(home)/Library/Containers",
+            "\(home)/Library/Caches",
+            "\(home)/Documents",
+            "\(home)/Desktop",
+            "\(home)/Downloads"
+        ]
+        if structuralRoots.contains(path) {
+            return (.protected, "Carpeta estructural raíz. Haz clic en ella para abrirla y eliminar subcarpetas específicas.")
         }
 
         for item in protectedExactOrPrefixPaths {
@@ -301,13 +353,12 @@ enum SafetyGuard {
         }
 
         let userCritical: [(subpath: String, reason: String)] = [
-            ("\(home)/Library/Keychains", "Llaveros y contraseñas locales."),
-            ("\(home)/.ssh", "Llaves privadas SSH."),
-            ("\(home)/.gnupg", "Llaves privadas GPG."),
-            ("\(home)/Library/Application Support/MobileSync/Backup", "Respaldos de iPhone/iPad."),
-            ("\(home)/Pictures/Photos Library.photoslibrary", "Fototeca principal."),
-            ("\(home)/Library/Mail", "Correos electrónicos locales."),
-            ("\(home)/Library/Messages", "Historial de iMessage.")
+            ("\(home)/Library/Keychains", "Llaveros y contraseñas encriptadas de macOS."),
+            ("\(home)/.ssh", "Llaves criptográficas privadas SSH."),
+            ("\(home)/.gnupg", "Llaves criptográficas privadas GPG."),
+            ("\(home)/Pictures/Photos Library.photoslibrary", "Fototeca principal del usuario."),
+            ("\(home)/Library/Mail", "Base de datos local de Apple Mail."),
+            ("\(home)/Library/Messages", "Historial local de iMessage.")
         ]
 
         for item in userCritical {
@@ -316,16 +367,17 @@ enum SafetyGuard {
             }
         }
 
+        // Everything else inside ~/Library/Application Support, ~/Library/Containers, dotfiles, etc. is UNLOCKED so the user can clean it!
         let cautionPaths: [(subpath: String, reason: String)] = [
-            ("\(home)/Documents", "Documentos personales."),
-            ("\(home)/Desktop", "Escritorio del usuario."),
-            ("\(home)/main", "Proyectos y repositorios de trabajo."),
-            ("/Applications", "Usa la pestaña Aplicaciones para desinstalar sin residuos."),
-            ("\(home)/Library/Application Support", "Configuración y datos de aplicaciones.")
+            ("\(home)/Documents/", "Archivo dentro de Documentos personales."),
+            ("\(home)/Desktop/", "Archivo en tu Escritorio."),
+            ("\(home)/main/", "Carpeta de tus repositorios de código."),
+            ("\(home)/Library/Application Support/", "Datos o caché de aplicación en Application Support."),
+            ("\(home)/Library/Containers/", "Contenedor sandboxed de aplicación.")
         ]
 
         for item in cautionPaths {
-            if path == item.subpath || path.hasPrefix(item.subpath + "/") {
+            if path.hasPrefix(item.subpath) {
                 return (.caution, item.reason)
             }
         }

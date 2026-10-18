@@ -324,7 +324,8 @@ struct DashboardView: View {
     var totalSafeCleanableBytes: Int64 {
         let safeCaches = scanner.cacheItems.filter { $0.safety == .safe }.reduce(Int64(0)) { $0 + $1.sizeBytes }
         let orphans = scanner.orphanedLeftovers.reduce(Int64(0)) { $0 + $1.sizeBytes }
-        return safeCaches + orphans
+        let surgical = scanner.surgicalItems.filter(\.isSelected).reduce(Int64(0)) { $0 + $1.sizeBytes }
+        return safeCaches + orphans + surgical
     }
 
     var totalAppsBytes: Int64 {
@@ -391,11 +392,12 @@ struct DashboardView: View {
                                 Task {
                                     scanner.selectOnlySafeCaches()
                                     await scanner.cleanSelectedCaches()
+                                    await scanner.cleanAllSelectedSurgicalItems()
                                 }
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "laser.burst")
-                                    Text("Barrido Rápido Seguro (\(ByteFormatter.string(from: scanner.totalSelectedCacheBytes)))")
+                                    Text("Barrido + Cirugía Segura (\(ByteFormatter.string(from: scanner.totalSelectedCacheBytes + scanner.totalSelectedSurgicalBytes)))")
                                         .fontWeight(.bold)
                                 }
                                 .padding(.horizontal, 16)
@@ -404,14 +406,14 @@ struct DashboardView: View {
                             .buttonStyle(.borderedProminent)
                             .tint(RamanTheme.stokesAmber)
                             .foregroundStyle(.black)
-                            .disabled(scanner.totalSelectedCacheBytes == 0 || scanner.isExecutingOperation)
+                            .disabled((scanner.totalSelectedCacheBytes + scanner.totalSelectedSurgicalBytes) == 0 || scanner.isExecutingOperation)
                         }
                     }
 
                     RamanSpectrumBar(
                         totalBytes: scanner.diskOverview.totalBytes,
                         usedBytes: scanner.diskOverview.usedBytes,
-                        reclaimableBytes: max(scanner.totalSelectedCacheBytes, totalSafeCleanableBytes),
+                        reclaimableBytes: max(scanner.totalSelectedCacheBytes + scanner.totalSelectedSurgicalBytes, totalSafeCleanableBytes),
                         appsBytes: totalAppsBytes
                     )
                 }
@@ -464,11 +466,11 @@ struct DashboardView: View {
                         }
 
                         LensPortalCard(
-                            title: "Espectro Disco",
-                            subtitle: "Mapa de carpetas + Rayos X Datos del Sistema",
-                            metric: ByteFormatter.string(from: scanner.systemDataItems.reduce(0) { $0 + $1.sizeBytes }),
-                            metricLabel: "Radiografiados en Sistema",
-                            icon: "prism.fill",
+                            title: "Espectro Disco & Cirugía",
+                            subtitle: "Limpia dentro de Application Support y Datos del Sistema",
+                            metric: ByteFormatter.string(from: scanner.surgicalItems.reduce(0) { $0 + $1.sizeBytes }),
+                            metricLabel: "\(scanner.surgicalItems.count) objetivos quirúrgicos ocultos",
+                            icon: "scissors",
                             accent: RamanTheme.antiStokesViolet
                         ) {
                             selectedTab = .spaceLens
