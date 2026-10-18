@@ -291,6 +291,7 @@ struct SpaceLensView: View {
                                                     .foregroundStyle(isCurrent ? cat.color : .secondary)
                                             }
                                             .padding(11)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
                                             .background(
                                                 RoundedRectangle(cornerRadius: 12)
                                                     .fill(isCurrent ? RamanTheme.panelBg : Color.white.opacity(0.025))
@@ -299,6 +300,7 @@ struct SpaceLensView: View {
                                                 RoundedRectangle(cornerRadius: 12)
                                                     .stroke(isCurrent ? cat.color.opacity(0.45) : RamanTheme.borderSubtle, lineWidth: 1)
                                             )
+                                            .contentShape(Rectangle())
                                         }
                                         .buttonStyle(.plain)
                                     }
@@ -324,27 +326,34 @@ struct SpaceLensView: View {
                                         .toggleStyle(.checkbox)
                                         .labelsHidden()
 
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            HStack(spacing: 8) {
-                                                Text(item.title)
-                                                    .font(.subheadline.weight(.bold))
-                                                SafetyBadgeView(level: item.safety)
+                                        Button {
+                                            scanner.toggleSurgicalSelection(item)
+                                        } label: {
+                                            HStack {
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    HStack(spacing: 8) {
+                                                        Text(item.title)
+                                                            .font(.subheadline.weight(.bold))
+                                                        SafetyBadgeView(level: item.safety)
+                                                    }
+                                                    HStack(spacing: 6) {
+                                                        Image(systemName: "checkmark.shield.fill")
+                                                            .font(.caption2)
+                                                            .foregroundStyle(RamanTheme.emeraldSafe)
+                                                        Text(item.whatIsPreserved)
+                                                            .font(.caption)
+                                                            .foregroundStyle(RamanTheme.emeraldSafe.opacity(0.9))
+                                                    }
+                                                    Text(item.path)
+                                                        .font(.system(size: 10, design: .monospaced))
+                                                        .foregroundStyle(.secondary.opacity(0.7))
+                                                        .lineLimit(1)
+                                                }
+                                                Spacer()
                                             }
-                                            HStack(spacing: 6) {
-                                                Image(systemName: "checkmark.shield.fill")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(RamanTheme.emeraldSafe)
-                                                Text(item.whatIsPreserved)
-                                                    .font(.caption)
-                                                    .foregroundStyle(RamanTheme.emeraldSafe.opacity(0.9))
-                                            }
-                                            Text(item.path)
-                                                .font(.system(size: 10, design: .monospaced))
-                                                .foregroundStyle(.secondary.opacity(0.7))
-                                                .lineLimit(1)
+                                            .contentShape(Rectangle())
                                         }
-
-                                        Spacer()
+                                        .buttonStyle(.plain)
 
                                         Text(ByteFormatter.string(from: item.sizeBytes))
                                             .font(.system(.callout, design: .rounded).monospacedDigit().bold())

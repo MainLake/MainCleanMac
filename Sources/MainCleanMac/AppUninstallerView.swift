@@ -159,6 +159,7 @@ struct AppUninstallerView: View {
                                                 .foregroundStyle(isSelected ? .white : .secondary)
                                         }
                                         .padding(10)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                         .background(
                                             RoundedRectangle(cornerRadius: 11)
                                                 .fill(isSelected ? RamanTheme.panelBg : Color.clear)
@@ -167,6 +168,7 @@ struct AppUninstallerView: View {
                                             RoundedRectangle(cornerRadius: 11)
                                                 .stroke(isSelected ? RamanTheme.laserCyan.opacity(0.45) : Color.clear, lineWidth: 1)
                                         )
+                                        .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
                                 }

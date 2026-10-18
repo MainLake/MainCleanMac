@@ -162,6 +162,7 @@ struct SmartCachesView: View {
                                                 .foregroundStyle(isCurrent ? RamanTheme.stokesAmber : .secondary)
                                         }
                                         .padding(11)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                         .background(
                                             RoundedRectangle(cornerRadius: 12)
                                                 .fill(isCurrent ? RamanTheme.panelBg : Color.white.opacity(0.025))
@@ -170,6 +171,7 @@ struct SmartCachesView: View {
                                             RoundedRectangle(cornerRadius: 12)
                                                 .stroke(isCurrent ? category.color.opacity(0.45) : RamanTheme.borderSubtle, lineWidth: 1)
                                         )
+                                        .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -236,23 +238,30 @@ struct CleanableRowView: View {
             .toggleStyle(.checkbox)
             .labelsHidden()
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(item.name)
-                        .font(.subheadline.weight(.semibold))
-                    SafetyBadgeView(level: item.safety)
+            Button {
+                scanner.toggleCacheSelection(item)
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(item.name)
+                                .font(.subheadline.weight(.semibold))
+                            SafetyBadgeView(level: item.safety)
+                        }
+                        Text(item.description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Text(item.path)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary.opacity(0.65))
+                            .lineLimit(1)
+                    }
+                    Spacer()
                 }
-                Text(item.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(item.path)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary.opacity(0.65))
-                    .lineLimit(1)
+                .contentShape(Rectangle())
             }
-
-            Spacer()
+            .buttonStyle(.plain)
 
             Text(ByteFormatter.string(from: item.sizeBytes))
                 .font(.system(.callout, design: .rounded).monospacedDigit().bold())

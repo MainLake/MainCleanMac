@@ -273,6 +273,7 @@ struct MainCleanSidebar: View {
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(isSelected ? Color.white.opacity(0.065) : Color.clear)
@@ -281,6 +282,7 @@ struct MainCleanSidebar: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(isSelected ? MainCleanTheme.borderStrong : Color.clear, lineWidth: 1)
                         )
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 10)
@@ -309,11 +311,13 @@ struct MainCleanSidebar: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(MainCleanTheme.borderSubtle, lineWidth: 1)
                 )
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
