@@ -39,43 +39,20 @@ struct SpaceLensView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Top Lens Header
+            // Top Header
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 10) {
-                        Text(scanner.isAdvancedMode ? "Explorador y Datos del Sistema" : "Explorar mi Disco")
-                            .font(.system(size: 24, weight: .bold))
-                        if scanner.isAdvancedMode {
-                            Text("DATOS DEL SISTEMA Y CARPETAS")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(MainCleanTheme.accentIndigo)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(MainCleanTheme.accentIndigo.opacity(0.16), in: Capsule())
-                        }
-                    }
-                    Text(
-                        selectedMode == 0
-                            ? (scanner.isAdvancedMode
-                                ? "Limpia subcarpetas pesadas dentro de Application Support, apps fantasmas y carpetas ocultas sin perder tus sesiones."
-                                : "Archivos pesados que tus aplicaciones acumulan por dentro. Puedes limpiarlos sin perder tus cuentas ni sesiones.")
-                            : (selectedMode == 1
-                                ? "Descubre exactamente qué está ocupando espacio dentro de la sección 'Datos del Sistema' de tu Mac."
-                                : "Navega por tus carpetas ordenadas de mayor a menor tamaño y envía al Basurero lo que ya no necesites.")
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
+                Text(scanner.isAdvancedMode ? "Explorador de Disco" : "Mi Disco")
+                    .font(.system(size: 22, weight: .bold))
 
                 Spacer()
 
                 Picker("", selection: $selectedMode) {
-                    Text(scanner.isAdvancedMode ? "Cirugía Interna (\(scanner.surgicalItems.count))" : "Basura en tus Apps (\(scanner.surgicalItems.count))").tag(0)
-                    Text(scanner.isAdvancedMode ? "Rayos X: Sistema" : "Datos del Sistema").tag(1)
-                    Text("Mis Carpetas").tag(2)
+                    Text("Residuos en Apps (\(scanner.surgicalItems.count))").tag(0)
+                    Text("Datos del Sistema").tag(1)
+                    Text("Carpetas").tag(2)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 460)
+                .frame(width: 410)
 
                 Button {
                     Task {
@@ -94,7 +71,7 @@ struct SpaceLensView: View {
                 .help("Reescanear")
             }
             .padding(.horizontal, 28)
-            .padding(.vertical, 20)
+            .padding(.vertical, 18)
             .onAppear {
                 scanner.ensureSurgicalLoaded()
                 scanner.ensureSpaceLensLoaded()
@@ -129,7 +106,7 @@ struct SpaceLensView: View {
             }
         } message: {
             if let entry = entryPendingConfirmation {
-                Text("Tamaño: \(ByteFormatter.string(from: entry.sizeBytes)).\n\(entry.protectionReason ?? "Puedes recuperarlo desde el Basurero si lo necesitas.")")
+                Text("Tamaño: \(ByteFormatter.string(from: entry.sizeBytes))")
             }
         }
         .alert(
@@ -142,7 +119,7 @@ struct SpaceLensView: View {
             Button("Cancelar", role: .cancel) {
                 xrayItemPendingDelete = nil
             }
-            Button("Sí, Liberar Espacio", role: .destructive) {
+            Button("Liberar", role: .destructive) {
                 if let item = xrayItemPendingDelete {
                     Task { await scanner.cleanSystemDataItem(item) }
                 }
@@ -150,11 +127,11 @@ struct SpaceLensView: View {
             }
         } message: {
             if let item = xrayItemPendingDelete {
-                Text("\(item.explanation)\n\nEspacio a recuperar: \(ByteFormatter.string(from: item.sizeBytes))")
+                Text("\(item.explanation)\n\nEspacio: \(ByteFormatter.string(from: item.sizeBytes))")
             }
         }
         .alert(
-            "Confirmar Cirugía: \(surgicalItemPendingDelete?.title ?? "")",
+            "¿Limpiar \(surgicalItemPendingDelete?.title ?? "")?",
             isPresented: Binding(
                 get: { surgicalItemPendingDelete != nil },
                 set: { if !$0 { surgicalItemPendingDelete = nil } }
@@ -163,7 +140,7 @@ struct SpaceLensView: View {
             Button("Cancelar", role: .cancel) {
                 surgicalItemPendingDelete = nil
             }
-            Button("Purgar Ahora", role: .destructive) {
+            Button("Limpiar", role: .destructive) {
                 if let item = surgicalItemPendingDelete {
                     Task { await scanner.cleanSurgicalItem(item) }
                 }
@@ -171,72 +148,56 @@ struct SpaceLensView: View {
             }
         } message: {
             if let item = surgicalItemPendingDelete {
-                Text("\(item.whatIsPreserved)\n\nEspacio a liberar: \(ByteFormatter.string(from: item.sizeBytes))")
+                Text("Espacio: \(ByteFormatter.string(from: item.sizeBytes))")
             }
         }
     }
 
-    // MARK: - Sub-Tab 0: Surgical Deep Cleaner (Safe Cleaning Inside Protected Folders)
+    // MARK: - Sub-Tab 0: Surgical Deep Cleaner
 
     private var surgicalDeepCleanerSubView: some View {
         let totalFoundBytes = scanner.surgicalItems.reduce(Int64(0)) { $0 + $1.sizeBytes }
 
         return Group {
             if scanner.isScanningSurgical && scanner.surgicalItems.isEmpty {
-                VStack(spacing: 14) {
+                VStack(spacing: 12) {
                     ProgressView()
-                        .scaleEffect(1.2)
+                        .scaleEffect(1.15)
                         .tint(RamanTheme.laserCyan)
-                    Text("Inspeccionando el interior de ~/Library/Application Support, versiones antiguas y dotfiles ocultos...")
+                    Text("Analizando carpetas...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if scanner.surgicalItems.isEmpty {
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 48))
+                        .font(.system(size: 42))
                         .foregroundStyle(RamanTheme.emeraldSafe)
-                    Text("Cirugía al día")
+                    Text("Sin residuos pendientes")
                         .font(.title3.bold())
-                    Text("No se detectaron residuos internos ni instalaciones fantasmas pendientes.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 0) {
-                    // Action Banner
-                    HStack(spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(RamanTheme.laserCyan.opacity(0.16))
-                                .frame(width: 40, height: 40)
-                            Image(systemName: "scissors")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(RamanTheme.laserCyan)
-                        }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Detectados \(ByteFormatter.string(from: totalFoundBytes)) ocultos dentro de carpetas del sistema y usuario")
-                                .font(.headline)
-                            Text("A diferencia de un explorador pasivo, aquí puedes extraer solo la basura interna (Crashpad, GPUCache, Service Workers, apps ya borradas, instaladores atorados y videos 4K) conservando tus inicios de sesión.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                    // Compact Action Bar
+                    HStack(spacing: 14) {
+                        Text("\(ByteFormatter.string(from: totalFoundBytes)) detectados")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
 
                         Spacer()
 
                         Button {
                             Task { await scanner.cleanAllSelectedSurgicalItems() }
                         } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "scissors")
-                                Text("Ejecutar Cirugía (\(ByteFormatter.string(from: scanner.totalSelectedSurgicalBytes)))")
+                            HStack(spacing: 6) {
+                                Image(systemName: "sparkles")
+                                Text("Limpiar seleccionados (\(ByteFormatter.string(from: scanner.totalSelectedSurgicalBytes)))")
                                     .fontWeight(.bold)
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(RamanTheme.stokesAmber)
@@ -244,21 +205,15 @@ struct SpaceLensView: View {
                         .disabled(scanner.totalSelectedSurgicalBytes == 0 || scanner.isExecutingOperation)
                     }
                     .padding(.horizontal, 28)
-                    .padding(.vertical, 16)
-                    .background(Color.black.opacity(0.22))
+                    .padding(.vertical, 12)
+                    .background(Color.black.opacity(0.18))
 
                     Divider().overlay(RamanTheme.borderSubtle)
 
-                    // 2-Column Split View: Left = 5 Surgical Categories, Right = Items
+                    // 2-Column Split View
                     HStack(spacing: 0) {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("LENTES DE CIRUGÍA")
-                                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 6)
-                                    .padding(.bottom, 4)
-
                                 ForEach(SurgicalCategory.allCases, id: \.self) { cat in
                                     let items = scanner.surgicalItems.filter { $0.category == cat }
                                     if !items.isEmpty {
@@ -272,18 +227,18 @@ struct SpaceLensView: View {
                                                 ZStack {
                                                     RoundedRectangle(cornerRadius: 9)
                                                         .fill(cat.color.opacity(isCurrent ? 0.24 : 0.12))
-                                                        .frame(width: 34, height: 34)
+                                                        .frame(width: 32, height: 32)
                                                     Image(systemName: cat.icon)
-                                                        .font(.system(size: 14, weight: .semibold))
+                                                        .font(.system(size: 13, weight: .semibold))
                                                         .foregroundStyle(cat.color)
                                                 }
 
                                                 VStack(alignment: .leading, spacing: 2) {
                                                     Text(cat.rawValue)
-                                                        .font(.system(size: 12, weight: isCurrent ? .bold : .medium, design: .rounded))
+                                                        .font(.system(size: 12.5, weight: isCurrent ? .bold : .medium, design: .rounded))
                                                         .foregroundStyle(.white)
-                                                        .lineLimit(2)
-                                                    Text("\(items.count) objetivos")
+                                                        .lineLimit(1)
+                                                    Text("\(items.count) elementos")
                                                         .font(.caption2)
                                                         .foregroundStyle(.secondary)
                                                 }
@@ -294,14 +249,14 @@ struct SpaceLensView: View {
                                                     .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                                                     .foregroundStyle(isCurrent ? cat.color : .secondary)
                                             }
-                                            .padding(11)
+                                            .padding(10)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                             .background(
-                                                RoundedRectangle(cornerRadius: 12)
+                                                RoundedRectangle(cornerRadius: 11)
                                                     .fill(isCurrent ? RamanTheme.panelBg : Color.white.opacity(0.025))
                                             )
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
+                                                RoundedRectangle(cornerRadius: 11)
                                                     .stroke(isCurrent ? cat.color.opacity(0.45) : RamanTheme.borderSubtle, lineWidth: 1)
                                             )
                                             .contentShape(Rectangle())
@@ -310,9 +265,9 @@ struct SpaceLensView: View {
                                     }
                                 }
                             }
-                            .padding(18)
+                            .padding(16)
                         }
-                        .frame(width: 315)
+                        .frame(width: 290)
                         .background(Color.black.opacity(0.16))
 
                         Rectangle()
@@ -320,7 +275,7 @@ struct SpaceLensView: View {
                             .frame(width: 1)
 
                         ScrollView {
-                            VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 ForEach(currentSurgicalItems) { item in
                                     HStack(spacing: 14) {
                                         Toggle("", isOn: Binding(
@@ -334,24 +289,21 @@ struct SpaceLensView: View {
                                             scanner.toggleSurgicalSelection(item)
                                         } label: {
                                             HStack {
-                                                VStack(alignment: .leading, spacing: 4) {
+                                                VStack(alignment: .leading, spacing: 3) {
                                                     HStack(spacing: 8) {
                                                         Text(item.title)
-                                                            .font(.subheadline.weight(.bold))
+                                                            .font(.subheadline.weight(.semibold))
                                                         SafetyBadgeView(level: item.safety)
-                                                    }
-                                                    HStack(spacing: 6) {
-                                                        Image(systemName: "checkmark.shield.fill")
-                                                            .font(.caption2)
-                                                            .foregroundStyle(RamanTheme.emeraldSafe)
-                                                        Text(item.whatIsPreserved)
-                                                            .font(.caption)
-                                                            .foregroundStyle(RamanTheme.emeraldSafe.opacity(0.9))
                                                     }
                                                     if scanner.isAdvancedMode {
                                                         Text(item.path)
                                                             .font(.system(size: 10, design: .monospaced))
                                                             .foregroundStyle(.secondary.opacity(0.7))
+                                                            .lineLimit(1)
+                                                    } else {
+                                                        Text(item.whatIsPreserved)
+                                                            .font(.caption)
+                                                            .foregroundStyle(.secondary)
                                                             .lineLimit(1)
                                                     }
                                                 }
@@ -368,10 +320,10 @@ struct SpaceLensView: View {
                                         Button {
                                             scanner.revealInFinder(path: item.path)
                                         } label: {
-                                            Image(systemName: "magnifyingglass")
+                                            Image(systemName: "folder")
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
-                                                .frame(width: 28, height: 28)
+                                                .frame(width: 26, height: 26)
                                                 .background(Color.white.opacity(0.06), in: Circle())
                                         }
                                         .buttonStyle(.plain)
@@ -384,7 +336,7 @@ struct SpaceLensView: View {
                                                 Task { await scanner.cleanSurgicalItem(item) }
                                             }
                                         } label: {
-                                            Text(scanner.isAdvancedMode ? "Purgar" : "Limpiar")
+                                            Text("Limpiar")
                                                 .font(.caption.weight(.bold))
                                                 .padding(.horizontal, 10)
                                                 .padding(.vertical, 5)
@@ -394,7 +346,7 @@ struct SpaceLensView: View {
                                         .foregroundStyle(.black)
                                         .disabled(scanner.isExecutingOperation)
                                     }
-                                    .padding(14)
+                                    .padding(12)
                                     .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 12))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12)
@@ -402,7 +354,7 @@ struct SpaceLensView: View {
                                     )
                                 }
                             }
-                            .padding(24)
+                            .padding(22)
                         }
                     }
                 }
@@ -410,7 +362,7 @@ struct SpaceLensView: View {
         }
     }
 
-    // MARK: - Sub-Tab 1: System Data X-Ray (Every item is actionable!)
+    // MARK: - Sub-Tab 1: System Data X-Ray
 
     private var systemDataXRaySubView: some View {
         let totalExplained = scanner.systemDataItems.reduce(Int64(0)) { $0 + $1.sizeBytes }
@@ -418,46 +370,28 @@ struct SpaceLensView: View {
 
         return Group {
             if scanner.isScanningSystemData && scanner.systemDataItems.isEmpty {
-                VStack(spacing: 14) {
+                VStack(spacing: 12) {
                     ProgressView()
-                        .scaleEffect(1.2)
+                        .scaleEffect(1.15)
                         .tint(RamanTheme.laserCyan)
-                    Text("Analizando qué ocupa espacio dentro de 'Datos del Sistema'...")
+                    Text("Analizando Datos del Sistema...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        HStack(spacing: 20) {
-                            RamanPrismLogo(size: 52)
-
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(scanner.isAdvancedMode ? "Radiografía Accionable de 'Datos del Sistema'" : "¿Qué hay dentro de 'Datos del Sistema'?")
-                                    .font(.headline)
-                                Text("Puedes liberar directamente los elementos seguros o hacer clic en 'Abrir Interior' para ver qué subcarpetas ocupan más espacio y borrarlas.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Total identificado: \(ByteFormatter.string(from: totalExplained))")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
                             Spacer()
-
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(ByteFormatter.string(from: totalExplained))
-                                    .font(.system(.title2, design: .rounded).monospacedDigit().bold())
-                                    .foregroundStyle(RamanTheme.laserCyan)
-                                Text("Liberable directo: \(ByteFormatter.string(from: totalCleanable))")
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(RamanTheme.emeraldSafe)
-                            }
+                            Text("Liberable directo: \(ByteFormatter.string(from: totalCleanable))")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(RamanTheme.emeraldSafe)
                         }
-                        .padding(18)
-                        .background(RamanTheme.panelBg, in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(RamanTheme.laserCyan.opacity(0.28), lineWidth: 1)
-                        )
+                        .padding(.bottom, 4)
 
                         ForEach(scanner.systemDataItems) { item in
                             HStack(spacing: 14) {

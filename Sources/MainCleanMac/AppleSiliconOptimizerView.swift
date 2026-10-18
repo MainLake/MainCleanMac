@@ -101,22 +101,17 @@ struct AppleSiliconOptimizerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Top Lens Header
+            // Top Header
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 10) {
-                        Text("Desarrollo y Chip M")
-                            .font(.system(size: 24, weight: .bold))
-                        Text(scanner.mSeriesStatus.chipName.uppercased())
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(MainCleanTheme.emeraldSafe)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(MainCleanTheme.emeraldSafe.opacity(0.14), in: Capsule())
-                    }
-                    Text("Limpia dependencias pesadas de proyectos (node_modules/.venv), contenedores Docker, SQLite y binarios Apple Silicon.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Text("Desarrollo y Chip M")
+                        .font(.system(size: 22, weight: .bold))
+                    Text(scanner.mSeriesStatus.chipName.uppercased())
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(MainCleanTheme.emeraldSafe)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(MainCleanTheme.emeraldSafe.opacity(0.14), in: Capsule())
                 }
 
                 Spacer()

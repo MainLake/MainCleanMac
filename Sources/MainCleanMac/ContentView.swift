@@ -182,12 +182,12 @@ struct MainCleanTopBar: View {
 
             if scanner.isAdvancedMode {
                 HStack(spacing: 8) {
-                    Text("\(scanner.mSeriesStatus.chipName) · \(scanner.mSeriesStatus.physicalRAMGB) GB RAM")
+                    Text("\(scanner.mSeriesStatus.chipName) · \(scanner.mSeriesStatus.physicalRAMGB) GB")
                     if scanner.mSeriesStatus.swapUsedBytes > 0 {
-                        Text("· Swap: \(ByteFormatter.string(from: scanner.mSeriesStatus.swapUsedBytes))")
+                        Text("· Swap \(ByteFormatter.string(from: scanner.mSeriesStatus.swapUsedBytes))")
                     }
                     if scanner.mSeriesStatus.localSnapshotsCount > 0 {
-                        Text("· \(scanner.mSeriesStatus.localSnapshotsCount) Snapshots APFS")
+                        Text("· \(scanner.mSeriesStatus.localSnapshotsCount) Snapshots")
                     }
                 }
                 .font(.system(size: 10.5, weight: .medium, design: .monospaced))
@@ -197,11 +197,6 @@ struct MainCleanTopBar: View {
                 .background(MainCleanTheme.panelBg, in: Capsule())
                 .overlay(Capsule().stroke(MainCleanTheme.borderSubtle, lineWidth: 1))
                 .transition(.opacity)
-            } else {
-                Text("Explicaciones sencillas activadas · Tus contraseñas y archivos personales siempre están protegidos")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
 
             Spacer()
@@ -215,7 +210,7 @@ struct MainCleanTopBar: View {
                     HStack(spacing: 6) {
                         Image(systemName: "terminal")
                             .font(.system(size: 11, weight: .semibold))
-                        Text(scanner.showLogDrawer ? "Ocultar Consola" : "Consola (\(scanner.activityLogs.count))")
+                        Text("Consola (\(scanner.activityLogs.count))")
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                     }
                     .padding(.horizontal, 10)
@@ -238,15 +233,15 @@ struct MainCleanTopBar: View {
                 }
                 .padding(.horizontal, 11)
                 .padding(.vertical, 5)
-                .background(MainCleanTheme.panelBg, in: Capsule())
-                .overlay(Capsule().stroke(MainCleanTheme.borderSubtle, lineWidth: 1))
-                .contentShape(Capsule())
+                .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(MainCleanTheme.borderSubtle, lineWidth: 1))
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(scanner.isExecutingOperation)
         }
         .padding(.horizontal, 28)
-        .frame(height: 54)
+        .frame(height: 52)
         .background(MainCleanTheme.canvasBg)
     }
 }
@@ -264,24 +259,14 @@ struct TimedToastNotificationView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(MainCleanTheme.emeraldSafe.opacity(0.15))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(MainCleanTheme.emeraldSafe)
-                }
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(MainCleanTheme.emeraldSafe)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(message)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                    Text("El espacio libre de tu Mac ya se actualizó")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                }
+                Text(message)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
 
                 Spacer(minLength: 8)
 
@@ -290,7 +275,7 @@ struct TimedToastNotificationView: View {
                         showLogDrawer.toggle()
                     }
                 } label: {
-                    Text(showLogDrawer ? "Ocultar" : "Detalles")
+                    Text(showLogDrawer ? "Ocultar" : "Registro")
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -309,7 +294,7 @@ struct TimedToastNotificationView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 11)
+            .padding(.vertical, 10)
 
             // 4-second visual countdown bar
             GeometryReader { geo in
@@ -321,16 +306,16 @@ struct TimedToastNotificationView: View {
                         .frame(width: max(0, geo.size.width * progress))
                 }
             }
-            .frame(height: 2.5)
+            .frame(height: 2)
         }
-        .frame(width: 440)
+        .frame(width: 400)
         .background(Color(red: 0.11, green: 0.13, blue: 0.16).opacity(0.97))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(MainCleanTheme.emeraldSafe.opacity(0.32), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.45), radius: 16, y: 6)
+        .shadow(color: .black.opacity(0.45), radius: 14, y: 5)
         .onAppear {
             progress = 1.0
             withAnimation(.linear(duration: 4.0)) {
@@ -346,7 +331,7 @@ struct TimedToastNotificationView: View {
     }
 }
 
-// MARK: - MainCleanMac Sidebar (Clean, Spacious & Self-Explanatory)
+// MARK: - MainCleanMac Sidebar
 
 struct MainCleanSidebar: View {
     @EnvironmentObject var scanner: SystemScannerService
@@ -363,26 +348,17 @@ struct MainCleanSidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // App Brand Header
-            HStack(spacing: 12) {
-                MainCleanLogo(size: 36)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("MainCleanMac")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white)
-                    Text("APPLE SILICON")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(MainCleanTheme.brandBlue)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1.5)
-                        .background(MainCleanTheme.brandBlue.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
-                }
+            HStack(spacing: 10) {
+                MainCleanLogo(size: 32)
+                Text("MainCleanMac")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
             }
             .padding(.horizontal, 20)
             .padding(.top, 22)
 
-            // Navigation Items with Generous Spacing & Full Clickable Hit Area
-            VStack(alignment: .leading, spacing: 6) {
+            // Navigation Items
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(primaryTabs) { tab in
                     let isSelected = selectedTab == tab
                     if tab == .appleSilicon && !scanner.isAdvancedMode {
@@ -401,41 +377,23 @@ struct MainCleanSidebar: View {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(isSelected ? tab.accentColor : .secondary)
-                                .frame(width: 22)
+                                .frame(width: 20)
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 6) {
-                                    Text(tab.displayTitle(isAdvanced: scanner.isAdvancedMode))
-                                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                                        .foregroundStyle(isSelected ? .white : .primary.opacity(0.82))
-                                    if tab == .appleSilicon {
-                                        Text("PRO")
-                                            .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                                            .foregroundStyle(MainCleanTheme.brandBlue)
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 1)
-                                            .background(MainCleanTheme.brandBlue.opacity(0.14), in: Capsule())
-                                    }
-                                }
-                                if scanner.isAdvancedMode {
-                                    Text(tab.tagline)
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                            }
+                            Text(tab.displayTitle(isAdvanced: scanner.isAdvancedMode))
+                                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                                .foregroundStyle(isSelected ? .white : .primary.opacity(0.82))
 
                             Spacer()
                         }
                         .padding(.horizontal, 12)
-                        .padding(.vertical, scanner.isAdvancedMode ? 8 : 10)
+                        .padding(.vertical, 9)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: 9)
                                 .fill(isSelected ? MainCleanTheme.hoverBg : Color.clear)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: 9)
                                 .stroke(isSelected ? MainCleanTheme.borderStrong : Color.clear, lineWidth: 1)
                         )
                         .contentShape(Rectangle())
@@ -457,8 +415,8 @@ struct MainCleanSidebar: View {
                     Image(systemName: "terminal")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(scanner.isAdvancedMode ? "Consola en Vivo (\(scanner.activityLogs.count))" : "Ver Registro de Acciones")
-                        .font(.system(size: 11, weight: .medium))
+                    Text("Registro (\(scanner.activityLogs.count))")
+                        .font(.system(size: 11.5, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
                     Image(systemName: scanner.showLogDrawer ? "chevron.down" : "chevron.up")
@@ -481,12 +439,12 @@ struct MainCleanSidebar: View {
             // Live Free Space Widget in Sidebar
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("MI MAC")
+                    Text("DISCO")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(ByteFormatter.string(from: scanner.diskOverview.freeBytes)) LIBRES")
-                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                    Text("\(ByteFormatter.string(from: scanner.diskOverview.freeBytes)) libres")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(MainCleanTheme.emeraldSafe)
                         .contentTransition(.numericText())
                 }
@@ -503,7 +461,7 @@ struct MainCleanSidebar: View {
                 .frame(height: 6)
 
                 HStack {
-                    Text("Ocupado: \(ByteFormatter.string(from: scanner.diskOverview.usedBytes))")
+                    Text("\(ByteFormatter.string(from: scanner.diskOverview.usedBytes)) / \(ByteFormatter.string(from: scanner.diskOverview.totalBytes))")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -511,10 +469,6 @@ struct MainCleanSidebar: View {
                         Text("+\(ByteFormatter.string(from: scanner.sessionFreedBytes))")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(MainCleanTheme.emeraldSafe)
-                    } else {
-                        Text("Total: \(ByteFormatter.string(from: scanner.diskOverview.totalBytes))")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -527,12 +481,12 @@ struct MainCleanSidebar: View {
             .padding(.horizontal, 14)
             .padding(.bottom, 16)
         }
-        .frame(width: 248)
+        .frame(width: 235)
         .background(MainCleanTheme.sidebarBg)
     }
 }
 
-// MARK: - Screen 1: Inicio / Resumen General (Adapts to Modo Simple vs Modo Avanzado)
+// MARK: - Screen 1: Inicio
 
 struct DashboardView: View {
     @EnvironmentObject var scanner: SystemScannerService
@@ -551,47 +505,41 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                // 1. Spacious Hero Storage Card (Matches Superdesign Prototype)
-                VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 22) {
+                // 1. Storage Card
+                VStack(alignment: .leading, spacing: 16) {
                     HStack(alignment: .center, spacing: 20) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .firstTextBaseline, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
                                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                                     Text(ByteFormatter.string(from: scanner.diskOverview.freeBytes))
-                                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                                        .font(.system(size: 40, weight: .bold, design: .rounded))
                                         .foregroundStyle(.white)
                                         .contentTransition(.numericText())
                                     Text("disponibles")
-                                        .font(.system(size: 20, weight: .medium))
+                                        .font(.system(size: 18, weight: .medium))
                                         .foregroundStyle(.secondary)
                                 }
 
                                 if scanner.sessionFreedBytes > 0 {
-                                    HStack(spacing: 5) {
-                                        Image(systemName: "sparkles")
-                                            .font(.system(size: 11, weight: .bold))
-                                        Text("+\(ByteFormatter.string(from: scanner.sessionFreedBytes)) recuperados hoy")
-                                            .font(.system(size: 12, weight: .bold))
-                                    }
-                                    .foregroundStyle(MainCleanTheme.emeraldSafe)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 5)
-                                    .background(MainCleanTheme.emeraldSafe.opacity(0.14), in: Capsule())
-                                    .overlay(Capsule().stroke(MainCleanTheme.emeraldSafe.opacity(0.3), lineWidth: 1))
+                                    Text("+\(ByteFormatter.string(from: scanner.sessionFreedBytes)) liberados")
+                                        .font(.system(size: 11.5, weight: .bold))
+                                        .foregroundStyle(MainCleanTheme.emeraldSafe)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(MainCleanTheme.emeraldSafe.opacity(0.14), in: Capsule())
                                 }
                             }
 
-                            Text("Tu Mac tiene \(ByteFormatter.string(from: scanner.diskOverview.usedBytes)) ocupados de \(ByteFormatter.string(from: scanner.diskOverview.totalBytes)) en total. Detectamos \(ByteFormatter.string(from: totalReclaimableBytes)) que puedes recuperar hoy.")
-                                .font(.system(size: 13.5))
+                            Text("\(ByteFormatter.string(from: scanner.diskOverview.usedBytes)) en uso de \(ByteFormatter.string(from: scanner.diskOverview.totalBytes)) · \(ByteFormatter.string(from: totalReclaimableBytes)) por liberar")
+                                .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
                         }
 
                         Spacer()
 
                         if !scanner.isAdvancedMode {
-                            // Simple Mode: Clean 1-bar visual indicator
-                            VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 6) {
                                 GeometryReader { geo in
                                     ZStack(alignment: .leading) {
                                         Capsule()
@@ -602,22 +550,21 @@ struct DashboardView: View {
                                     }
                                     .overlay(Capsule().stroke(MainCleanTheme.borderSubtle, lineWidth: 1))
                                 }
-                                .frame(width: 240, height: 12)
+                                .frame(width: 220, height: 10)
 
                                 HStack {
-                                    Text("OCUPADO (\(Int(scanner.diskOverview.usedPercentage * 100))%)")
+                                    Text("Usado \(Int(scanner.diskOverview.usedPercentage * 100))%")
                                     Spacer()
-                                    Text("LIBRE (\(Int((1.0 - scanner.diskOverview.usedPercentage) * 100))%)")
+                                    Text("Libre \(Int((1.0 - scanner.diskOverview.usedPercentage) * 100))%")
                                         .foregroundStyle(MainCleanTheme.emeraldSafe)
                                 }
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .font(.system(size: 10.5, weight: .medium))
                                 .foregroundStyle(.secondary)
-                                .frame(width: 240)
+                                .frame(width: 220)
                             }
                         }
                     }
 
-                    // In Modo Avanzado (Pro), show the full 4-segment technical APFS bar
                     if scanner.isAdvancedMode {
                         Divider().overlay(MainCleanTheme.borderSubtle)
                         MainCleanStorageBar(
@@ -628,57 +575,49 @@ struct DashboardView: View {
                         )
                     }
                 }
-                .padding(28)
-                .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 20))
+                .padding(24)
+                .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 16))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: 16)
                         .stroke(MainCleanTheme.borderSubtle, lineWidth: 1)
                 )
 
-                // 2. Two Calm, Spacious Action Cards (Simple by Default, Technical Checklist in Pro Mode)
-                HStack(alignment: .top, spacing: 20) {
-                    // Card 1: Limpieza Rápida (Recomendada)
-                    VStack(alignment: .leading, spacing: 18) {
-                        HStack(alignment: .top) {
+                // 2. Two Action Cards
+                HStack(alignment: .top, spacing: 18) {
+                    // Card 1: Limpieza Rápida
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .center, spacing: 12) {
                             ZStack {
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: 11)
                                     .fill(MainCleanTheme.emeraldSafe.opacity(0.12))
-                                    .frame(width: 46, height: 46)
+                                    .frame(width: 40, height: 40)
                                 Image(systemName: "bolt.fill")
-                                    .font(.system(size: 20, weight: .semibold))
+                                    .font(.system(size: 17, weight: .semibold))
                                     .foregroundStyle(MainCleanTheme.emeraldSafe)
                             }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Limpieza Rápida")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("Cachés, archivos temporales y registros")
+                                    .font(.system(size: 12.5))
+                                    .foregroundStyle(.secondary)
+                            }
                             Spacer()
-                            Text("RECOMENDADA · SIN PREGUNTAR")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundStyle(MainCleanTheme.emeraldSafe)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4)
-                                .background(MainCleanTheme.emeraldSafe.opacity(0.12), in: Capsule())
                         }
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Limpieza Rápida")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(.white)
-                            Text("Borra archivos temporales e innecesarios (incluyendo actualizadores viejos como GoogleUpdater) sin cerrar tus programas ni borrar tus contraseñas.")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        // Progressive Disclosure: Expandable details or automatically shown in Modo Avanzado
                         VStack(alignment: .leading, spacing: 8) {
                             Button {
                                 withAnimation(.spring(duration: 0.2)) {
                                     showQuickTechDetails.toggle()
                                 }
                             } label: {
-                                HStack(spacing: 6) {
-                                    Text(scanner.isAdvancedMode || showQuickTechDetails ? "Ocultar desglose técnico" : "Ver qué incluye (Cachés, GoogleUpdater, Logs y SQLite)")
+                                HStack(spacing: 5) {
+                                    Text(scanner.isAdvancedMode || showQuickTechDetails ? "Ocultar detalle" : "Ver detalle")
                                         .font(.system(size: 12, weight: .medium))
                                     Image(systemName: (scanner.isAdvancedMode || showQuickTechDetails) ? "chevron.up" : "chevron.down")
-                                        .font(.system(size: 10, weight: .bold))
+                                        .font(.system(size: 9.5, weight: .bold))
                                 }
                                 .foregroundStyle(MainCleanTheme.emeraldSafe)
                                 .contentShape(Rectangle())
@@ -688,22 +627,22 @@ struct DashboardView: View {
                             if scanner.isAdvancedMode || showQuickTechDetails {
                                 VStack(alignment: .leading, spacing: 6) {
                                     QuickBreakdownRow(
-                                        label: "Cachés de navegadores y sistema (~/Library/Caches)",
+                                        label: "Cachés de navegadores y sistema",
                                         bytes: scanner.cacheItems.filter { $0.safety == .safe && ($0.category == .systemAndGeneral || $0.category == .browsersAndApps || $0.category == .xcodeAndSimulators) }.reduce(0) { $0 + $1.sizeBytes }
                                     )
                                     QuickBreakdownRow(
-                                        label: "Basura interna en Application Support (GoogleUpdater, GPUCache, Crashpad)",
+                                        label: "Temporales de apps (GoogleUpdater, GPUCache, Crashpad)",
                                         bytes: scanner.surgicalItems.filter { $0.safety == .safe && $0.category == .appSupportSurgery && !$0.path.contains("com.docker.install") }.reduce(0) { $0 + $1.sizeBytes }
                                     )
                                     QuickBreakdownRow(
-                                        label: "Compactación SQLite VACUUM y caché QuickLook",
+                                        label: "Bases SQLite y vistas previas",
                                         bytes: scanner.mSeriesItems.filter { $0.safety == .safe && ($0.kind == .sqliteVacuum || $0.kind == .binaryArchitecture || $0.actionCode == "QL_RESET") }.reduce(0) { $0 + $1.sizeBytes }
                                     )
 
                                     Button {
                                         selectedTab = .smartCaches
                                     } label: {
-                                        Text("Personalizar selección elemento por elemento →")
+                                        Text("Elegir elementos →")
                                             .font(.system(size: 11, weight: .semibold))
                                             .foregroundStyle(MainCleanTheme.brandBlue)
                                             .padding(.top, 2)
@@ -717,7 +656,7 @@ struct DashboardView: View {
                             }
                         }
 
-                        Spacer(minLength: 4)
+                        Spacer(minLength: 2)
 
                         Button {
                             Task {
@@ -726,11 +665,11 @@ struct DashboardView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")
-                                Text("Limpiar \(ByteFormatter.string(from: scanner.quickSafeCleanableBytes)) ahora")
-                                    .font(.system(size: 14.5, weight: .bold))
+                                Text("Limpiar \(ByteFormatter.string(from: scanner.quickSafeCleanableBytes))")
+                                    .font(.system(size: 14, weight: .bold))
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, 9)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.borderedProminent)
@@ -738,45 +677,37 @@ struct DashboardView: View {
                         .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.08))
                         .disabled(scanner.isExecutingOperation)
                     }
-                    .padding(24)
+                    .padding(22)
                     .frame(maxWidth: .infinity)
-                    .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 20))
+                    .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 16))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(MainCleanTheme.emeraldSafe.opacity(0.25), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(MainCleanTheme.emeraldSafe.opacity(0.22), lineWidth: 1)
                     )
 
-                    // Card 2: Liberar Espacio Oculto (Datos del Sistema)
-                    VStack(alignment: .leading, spacing: 18) {
-                        HStack(alignment: .top) {
+                    // Card 2: Limpieza Profunda
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .center, spacing: 12) {
                             ZStack {
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: 11)
                                     .fill(MainCleanTheme.amberCaution.opacity(0.12))
-                                    .frame(width: 46, height: 46)
+                                    .frame(width: 40, height: 40)
                                 Image(systemName: "internaldrive.fill")
-                                    .font(.system(size: 20, weight: .semibold))
+                                    .font(.system(size: 17, weight: .semibold))
                                     .foregroundStyle(MainCleanTheme.amberCaution)
                             }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Limpieza Profunda")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("Instaladores antiguos, paquetes y restos de apps")
+                                    .font(.system(size: 12.5))
+                                    .foregroundStyle(.secondary)
+                            }
                             Spacer()
-                            Text("DATOS DEL SISTEMA & HUÉRFANOS")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundStyle(MainCleanTheme.amberCaution)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4)
-                                .background(MainCleanTheme.amberCaution.opacity(0.12), in: Capsule())
                         }
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Liberar Espacio Oculto")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(.white)
-                            Text("Recupera gigabytes atrapados por instaladores viejos (como Docker 2.26 GB), restos de programas que ya borraste y videos pesados de macOS.")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        // Progressive Disclosure for Deep Cleanup
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 14) {
                                 Button {
@@ -784,11 +715,11 @@ struct DashboardView: View {
                                         showDeepTechDetails.toggle()
                                     }
                                 } label: {
-                                    HStack(spacing: 6) {
-                                        Text(scanner.isAdvancedMode || showDeepTechDetails ? "Ocultar desglose" : "Ver qué incluye")
+                                    HStack(spacing: 5) {
+                                        Text(scanner.isAdvancedMode || showDeepTechDetails ? "Ocultar detalle" : "Ver detalle")
                                             .font(.system(size: 12, weight: .medium))
                                         Image(systemName: (scanner.isAdvancedMode || showDeepTechDetails) ? "chevron.up" : "chevron.down")
-                                            .font(.system(size: 10, weight: .bold))
+                                            .font(.system(size: 9.5, weight: .bold))
                                     }
                                     .foregroundStyle(MainCleanTheme.amberCaution)
                                     .contentShape(Rectangle())
@@ -798,14 +729,10 @@ struct DashboardView: View {
                                 Button {
                                     selectedTab = .spaceLens
                                 } label: {
-                                    HStack(spacing: 4) {
-                                        Text("Elegir qué borrar manualmente")
-                                            .font(.system(size: 12, weight: .medium))
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 10, weight: .bold))
-                                    }
-                                    .foregroundStyle(.secondary)
-                                    .contentShape(Rectangle())
+                                    Text("Revisar uno por uno →")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -813,15 +740,15 @@ struct DashboardView: View {
                             if scanner.isAdvancedMode || showDeepTechDetails {
                                 VStack(alignment: .leading, spacing: 6) {
                                     QuickBreakdownRow(
-                                        label: "Instaladores atorados y apps ya desinstaladas (Application Support)",
+                                        label: "Instaladores y apps desinstaladas",
                                         bytes: scanner.surgicalItems.filter { $0.safety == .safe && ($0.path.contains("com.docker.install") || $0.category == .orphanedAppsData) }.reduce(0) { $0 + $1.sizeBytes }
                                     )
                                     QuickBreakdownRow(
-                                        label: "Gestores de paquetes (Homebrew, npm, pnpm, uv, Cargo)",
+                                        label: "Paquetes (Homebrew, npm, pnpm, uv, Cargo)",
                                         bytes: scanner.cacheItems.filter { $0.safety == .safe && ($0.category == .packageManagers || $0.category == .aiAndDevTools) }.reduce(0) { $0 + $1.sizeBytes }
                                     )
                                     QuickBreakdownRow(
-                                        label: "Videos 4K de macOS y carpetas ocultas (~/.claude, salvapantallas)",
+                                        label: "Videos 4K de macOS y carpetas ocultas",
                                         bytes: scanner.surgicalItems.filter { $0.safety == .safe && ($0.category == .macOSWallpaperAndMedia || $0.category == .hiddenDotfileBloat) }.reduce(0) { $0 + $1.sizeBytes }
                                     )
                                 }
@@ -831,7 +758,7 @@ struct DashboardView: View {
                             }
                         }
 
-                        Spacer(minLength: 4)
+                        Spacer(minLength: 2)
 
                         Button {
                             Task {
@@ -840,11 +767,11 @@ struct DashboardView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "flame.fill")
-                                Text("Liberar \(ByteFormatter.string(from: scanner.deepSystemCleanableBytes)) ocultos")
-                                    .font(.system(size: 14.5, weight: .bold))
+                                Text("Liberar \(ByteFormatter.string(from: scanner.deepSystemCleanableBytes))")
+                                    .font(.system(size: 14, weight: .bold))
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, 9)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.borderedProminent)
@@ -852,110 +779,85 @@ struct DashboardView: View {
                         .foregroundStyle(Color(red: 0.12, green: 0.07, blue: 0.01))
                         .disabled(scanner.isExecutingOperation)
                     }
-                    .padding(24)
+                    .padding(22)
                     .frame(maxWidth: .infinity)
-                    .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 20))
+                    .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 16))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(MainCleanTheme.amberCaution.opacity(0.25), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(MainCleanTheme.amberCaution.opacity(0.22), lineWidth: 1)
                     )
                 }
 
-                // 3. In Modo Avanzado (Pro), show the 4 Quick-Jump Technical Summary Cards
+                // 3. Pro Quick Cards
                 if scanner.isAdvancedMode {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("ACCESO DIRECTO A HERRAMIENTAS AVANZADAS")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .tracking(0.6)
-                            .foregroundStyle(.secondary)
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12)
+                    ], spacing: 12) {
+                        ModuleSummaryCard(
+                            title: "Cachés",
+                            subtitle: "",
+                            metric: ByteFormatter.string(from: scanner.totalSelectedCacheBytes),
+                            detail: "\(scanner.cacheItems.count) elementos",
+                            icon: "sparkles.rectangle.stack.fill",
+                            accent: MainCleanTheme.accentBlue
+                        ) {
+                            selectedTab = .smartCaches
+                        }
 
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12)
-                        ], spacing: 12) {
-                            ModuleSummaryCard(
-                                title: "Cachés y Paquetes",
-                                subtitle: "Selección manual",
-                                metric: ByteFormatter.string(from: scanner.totalSelectedCacheBytes),
-                                detail: "\(scanner.cacheItems.count) cachés detectadas",
-                                icon: "sparkles.rectangle.stack.fill",
-                                accent: MainCleanTheme.accentBlue
-                            ) {
-                                selectedTab = .smartCaches
-                            }
+                        ModuleSummaryCard(
+                            title: "Aplicaciones",
+                            subtitle: "",
+                            metric: "\(scanner.installedApps.count) Apps",
+                            detail: "\(scanner.orphanedLeftovers.count) restos",
+                            icon: "trash",
+                            accent: MainCleanTheme.crimsonDanger
+                        ) {
+                            selectedTab = .uninstaller
+                        }
 
-                            ModuleSummaryCard(
-                                title: "Desinstalador",
-                                subtitle: "Apps y restos huérfanos",
-                                metric: "\(scanner.installedApps.count) Apps",
-                                detail: "\(scanner.orphanedLeftovers.count) restos de apps borradas",
-                                icon: "trash",
-                                accent: MainCleanTheme.crimsonDanger
-                            ) {
-                                selectedTab = .uninstaller
-                            }
+                        ModuleSummaryCard(
+                            title: "Disco",
+                            subtitle: "",
+                            metric: ByteFormatter.string(from: scanner.totalSelectedSurgicalBytes),
+                            detail: "\(scanner.surgicalItems.count) objetivos",
+                            icon: "folder",
+                            accent: MainCleanTheme.accentIndigo
+                        ) {
+                            selectedTab = .spaceLens
+                        }
 
-                            ModuleSummaryCard(
-                                title: "Explorar mi Disco",
-                                subtitle: "Cirugía y carpetas",
-                                metric: ByteFormatter.string(from: scanner.totalSelectedSurgicalBytes),
-                                detail: "\(scanner.surgicalItems.count) objetivos internos",
-                                icon: "folder",
-                                accent: MainCleanTheme.accentIndigo
-                            ) {
-                                selectedTab = .spaceLens
-                            }
-
-                            ModuleSummaryCard(
-                                title: "Desarrollo y Chip M",
-                                subtitle: "node_modules, Docker y SQLite",
-                                metric: ByteFormatter.string(from: scanner.projectArtifacts.reduce(0) { $0 + $1.sizeBytes }),
-                                detail: "\(scanner.projectArtifacts.count) carpetas de proyectos",
-                                icon: "terminal.fill",
-                                accent: MainCleanTheme.emeraldSafe
-                            ) {
-                                selectedTab = .appleSilicon
-                            }
+                        ModuleSummaryCard(
+                            title: "Desarrollo",
+                            subtitle: "",
+                            metric: ByteFormatter.string(from: scanner.projectArtifacts.reduce(0) { $0 + $1.sizeBytes }),
+                            detail: "\(scanner.projectArtifacts.count) proyectos",
+                            icon: "terminal.fill",
+                            accent: MainCleanTheme.emeraldSafe
+                        ) {
+                            selectedTab = .appleSilicon
                         }
                     }
                     .transition(.opacity)
                 }
 
-                // 4. Clean Bottom Automatic Maintenance Row (Simple Toggle in Simple Mode, Full Controls in Pro Mode)
-                HStack(spacing: 16) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill((scanner.isScheduleInstalled ? MainCleanTheme.emeraldSafe : MainCleanTheme.accentBlue).opacity(0.12))
-                            .frame(width: 42, height: 42)
-                        Image(systemName: "clock.arrow.2.circlepath")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(scanner.isScheduleInstalled ? MainCleanTheme.emeraldSafe : MainCleanTheme.accentBlue)
-                    }
+                // 4. Automatic Schedule Row
+                HStack(spacing: 14) {
+                    Image(systemName: "clock.arrow.2.circlepath")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(scanner.isScheduleInstalled ? MainCleanTheme.emeraldSafe : .secondary)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 8) {
-                            Text("Limpieza Automática Semanal")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.white)
-                            if scanner.isScheduleInstalled {
-                                Text("ACTIVA")
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                    .foregroundStyle(MainCleanTheme.emeraldSafe)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(MainCleanTheme.emeraldSafe.opacity(0.12), in: Capsule())
-                            }
-                        }
-                        Text(
-                            scanner.isAdvancedMode
-                                ? "Agente nativo launchd (\(scanner.launchAgentPath))"
-                                : "Tu Mac se mantendrá optimizada automáticamente en segundo plano sin cerrar tus programas."
-                        )
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    Text("Limpieza automática")
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    if scanner.isAdvancedMode {
+                        Text(scanner.launchAgentPath)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
 
                     Spacer()
@@ -967,7 +869,7 @@ struct DashboardView: View {
                             }
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 200)
+                        .frame(width: 190)
                         .onChange(of: scanner.selectedFrequency) { _, _ in
                             if scanner.isScheduleInstalled {
                                 scanner.installOrUpdateSchedule()
@@ -989,10 +891,11 @@ struct DashboardView: View {
                     .tint(MainCleanTheme.brandBlue)
                     .labelsHidden()
                 }
-                .padding(20)
-                .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(MainCleanTheme.panelBg, in: RoundedRectangle(cornerRadius: 14))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .stroke(MainCleanTheme.borderSubtle, lineWidth: 1)
                 )
             }

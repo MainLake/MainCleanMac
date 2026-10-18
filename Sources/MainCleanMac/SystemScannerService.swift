@@ -312,34 +312,34 @@ final class SystemScannerService: ObservableObject {
         defer { isScanningCaches = false }
 
         let targets: [(String, String, String, String, CacheCategory, SafetyLevel, Bool, String?)] = [
-            ("Papelera del Usuario (~/.Trash)", "Archivos que ya borraste pero siguen ocupando espacio en el disco.", "Al vaciar la Papelera los archivos dentro de ella se eliminan definitivamente.", "\(home)/.Trash", .systemAndGeneral, .caution, false, nil),
-            ("Instaladores Descargados (.dmg / .pkg / .iso)", "Imágenes de disco e instaladores olvidados en tu carpeta Downloads.", "El programa ya instalado en /Applications no se ve afectado al borrar su instalador .dmg o .pkg.", "\(home)/Downloads", .systemAndGeneral, .safe, true, "FIND_INSTALLERS"),
-            ("Registros y Diagnósticos (~/Library/Logs)", "Reportes de fallos y logs antiguos de aplicaciones de usuario.", "Totalmente seguro; las apps crearán nuevos logs si los necesitan.", "\(home)/Library/Logs", .systemAndGeneral, .safe, false, nil),
-            ("Estados Guardados de Ventanas", "Posición de ventanas de apps cerradas (Saved Application State).", "Seguro de limpiar; las apps simplemente abrirán en su ventana predeterminada.", "\(home)/Library/Saved Application State", .systemAndGeneral, .safe, false, nil),
+            ("Papelera", "Archivos en el Basurero", "Vacía la Papelera", "\(home)/.Trash", .systemAndGeneral, .caution, false, nil),
+            ("Instaladores (.dmg / .pkg / .iso)", "Instaladores en Descargas", "Instaladores en ~/Downloads", "\(home)/Downloads", .systemAndGeneral, .safe, true, "FIND_INSTALLERS"),
+            ("Registros (~/Library/Logs)", "Logs de aplicaciones", "~/Library/Logs", "\(home)/Library/Logs", .systemAndGeneral, .safe, false, nil),
+            ("Estados de Ventanas", "Saved Application State", "~/Library/Saved Application State", "\(home)/Library/Saved Application State", .systemAndGeneral, .safe, false, nil),
 
-            ("Caché de Google Chrome", "Imágenes, scripts y fragmentos web temporales de Chrome.", "No borra tus contraseñas, historial ni pestañas abiertas.", "\(home)/Library/Caches/Google/Chrome", .browsersAndApps, .safe, false, nil),
-            ("Caché de Safari", "Archivos web temporales de Apple Safari.", "No borra tus marcadores ni contraseñas guardadas en iCloud.", "\(home)/Library/Caches/com.apple.Safari", .browsersAndApps, .safe, false, nil),
-            ("Caché de Spotify", "Canciones y portadas almacenadas en caché temporal.", "No borra tus playlists ni tu cuenta.", "\(home)/Library/Caches/com.spotify.client", .browsersAndApps, .safe, false, nil),
-            ("Actualizaciones Residuales (ShipIt / Updaters)", "Paquetes temporales descargados por auto-actualizadores de apps.", "Seguro: la actualización ya fue aplicada.", "\(home)/Library/Caches/com.google.antigravity.ShipIt", .browsersAndApps, .safe, false, nil),
-            ("Respaldos Locales de iPhone/iPad (MobileSync)", "Copias de seguridad completas de dispositivos iOS en esta Mac.", "¡Atención! Borrar esto eliminará tus respaldos locales de iPhone/iPad.", "\(home)/Library/Application Support/MobileSync/Backup", .browsersAndApps, .caution, true, nil),
+            ("Caché de Google Chrome", "Archivos temporales web", "~/Library/Caches/Google/Chrome", "\(home)/Library/Caches/Google/Chrome", .browsersAndApps, .safe, false, nil),
+            ("Caché de Safari", "Archivos temporales web", "~/Library/Caches/com.apple.Safari", "\(home)/Library/Caches/com.apple.Safari", .browsersAndApps, .safe, false, nil),
+            ("Caché de Spotify", "Audio y portadas en caché", "~/Library/Caches/com.spotify.client", "\(home)/Library/Caches/com.spotify.client", .browsersAndApps, .safe, false, nil),
+            ("Actualizaciones ShipIt", "Paquetes temporales de actualización", "~/Library/Caches/com.google.antigravity.ShipIt", "\(home)/Library/Caches/com.google.antigravity.ShipIt", .browsersAndApps, .safe, false, nil),
+            ("Respaldos iOS (MobileSync)", "Copias locales de iPhone/iPad", "~/Library/Application Support/MobileSync/Backup", "\(home)/Library/Application Support/MobileSync/Backup", .browsersAndApps, .caution, true, nil),
 
-            ("Caché de npm", "Tarballs de paquetes Node descargados en ~/.npm/_cacache.", "100% seguro; tus carpetas node_modules activas no se tocan.", "\(home)/.npm/_cacache", .packageManagers, .safe, false, nil),
-            ("Store de pnpm", "Almacén global de paquetes de pnpm.", "Si limpias el store, pnpm volverá a descargar paquetes en futuros installs.", "\(home)/Library/pnpm/store", .packageManagers, .safe, false, nil),
-            ("Caché de Python (uv)", "Wheels y paquetes precompilados de uv.", "Seguro; tus entornos .venv activos siguen funcionando igual.", "\(home)/.cache/uv", .packageManagers, .safe, false, nil),
-            ("Caché de pip", "Paquetes descargados por pip en caché.", "Seguro; no desinstala librerías de tus proyectos.", "\(home)/Library/Caches/pip", .packageManagers, .safe, false, nil),
-            ("Caché de Cargo / Rust", "Crates descargados en ~/.cargo/registry/cache.", "Seguro; solo descargará de nuevo los crates que compiles en el futuro.", "\(home)/.cargo/registry/cache", .packageManagers, .safe, false, nil),
-            ("Caché de Maven (.m2)", "Dependencias JAR descargadas por proyectos Java.", "En tu próxima compilación Maven volverá a bajar los JARs necesarios.", "\(home)/.m2/repository", .packageManagers, .caution, true, nil),
-            ("Caché de Homebrew", "Instaladores antiguos descargados por brew.", "No desinstala tus programas de Homebrew, solo limpia instaladores viejos.", "\(home)/Library/Caches/Homebrew", .packageManagers, .safe, false, "/opt/homebrew/bin/brew cleanup --prune=all"),
+            ("Caché de npm", "Paquetes en ~/.npm/_cacache", "~/.npm/_cacache", "\(home)/.npm/_cacache", .packageManagers, .safe, false, nil),
+            ("Store de pnpm", "Almacén global de pnpm", "~/Library/pnpm/store", "\(home)/Library/pnpm/store", .packageManagers, .safe, false, nil),
+            ("Caché de uv", "Paquetes Python en ~/.cache/uv", "~/.cache/uv", "\(home)/.cache/uv", .packageManagers, .safe, false, nil),
+            ("Caché de pip", "Paquetes descargados por pip", "~/Library/Caches/pip", "\(home)/Library/Caches/pip", .packageManagers, .safe, false, nil),
+            ("Caché de Cargo / Rust", "Crates en ~/.cargo/registry/cache", "~/.cargo/registry/cache", "\(home)/.cargo/registry/cache", .packageManagers, .safe, false, nil),
+            ("Repositorio Maven (.m2)", "Dependencias Java en ~/.m2", "~/.m2/repository", "\(home)/.m2/repository", .packageManagers, .caution, true, nil),
+            ("Caché de Homebrew", "Instaladores en ~/Library/Caches/Homebrew", "~/Library/Caches/Homebrew", "\(home)/Library/Caches/Homebrew", .packageManagers, .safe, false, "/opt/homebrew/bin/brew cleanup --prune=all"),
 
-            ("Navegadores de Playwright", "Binarios de Chromium/Firefox/WebKit para pruebas automatizadas.", "Si corres tests E2E después, requerirás ejecutar 'npx playwright install'.", "\(home)/Library/Caches/ms-playwright", .aiAndDevTools, .caution, false, nil),
-            ("Modelos de HuggingFace", "Pesos de modelos de IA descargados en ~/.cache/huggingface.", "Si los usas localmente, tendrán que volver a descargarse.", "\(home)/.cache/huggingface", .aiAndDevTools, .caution, true, nil),
-            ("Codex Worktrees Temporales", "Copias de repositorios creadas por sesiones antiguas de Codex.", "Revisa que no tengas cambios sin fusionar en sesiones activas.", "\(home)/.codex/worktrees", .aiAndDevTools, .caution, true, nil),
-            ("Runtimes y Caché de Codex", "Runtimes temporales y caché de OpenAI Codex.", "Se regeneran automáticamente al iniciar Codex.", "\(home)/.cache/codex-runtimes", .aiAndDevTools, .safe, false, nil),
-            ("Caché de GitHub Copilot", "Archivos temporales del agente Copilot.", "Seguro de eliminar.", "\(home)/Library/Caches/copilot", .aiAndDevTools, .safe, false, nil),
+            ("Playwright Browsers", "Navegadores de prueba", "~/Library/Caches/ms-playwright", "\(home)/Library/Caches/ms-playwright", .aiAndDevTools, .caution, false, nil),
+            ("Modelos HuggingFace", "Modelos en ~/.cache/huggingface", "~/.cache/huggingface", "\(home)/.cache/huggingface", .aiAndDevTools, .caution, true, nil),
+            ("Codex Worktrees", "Worktrees en ~/.codex/worktrees", "~/.codex/worktrees", "\(home)/.codex/worktrees", .aiAndDevTools, .caution, true, nil),
+            ("Caché de Codex", "Runtimes en ~/.cache/codex-runtimes", "~/.cache/codex-runtimes", "\(home)/.cache/codex-runtimes", .aiAndDevTools, .safe, false, nil),
+            ("Caché de Copilot", "Temporales en ~/Library/Caches/copilot", "~/Library/Caches/copilot", "\(home)/Library/Caches/copilot", .aiAndDevTools, .safe, false, nil),
 
-            ("Xcode DerivedData", "Índices y binarios intermedios de compilación de Xcode.", "Seguro; Xcode recompilará el proyecto la próxima vez que lo abras.", "\(home)/Library/Developer/Xcode/DerivedData", .xcodeAndSimulators, .safe, false, nil),
-            ("Caché de Xcode", "Caché interna de compilación de Xcode.", "Seguro de limpiar.", "\(home)/Library/Caches/com.apple.dt.Xcode", .xcodeAndSimulators, .safe, false, nil),
-            ("Cachés de CoreSimulator", "Archivos temporales de simuladores de iOS.", "Seguro si no estás corriendo un simulador ahora mismo.", "\(home)/Library/Developer/CoreSimulator/Caches", .xcodeAndSimulators, .safe, false, nil)
+            ("Xcode DerivedData", " Archivos de compilación de Xcode", "~/Library/Developer/Xcode/DerivedData", "\(home)/Library/Developer/Xcode/DerivedData", .xcodeAndSimulators, .safe, false, nil),
+            ("Caché de Xcode", "Caché en ~/Library/Caches/com.apple.dt.Xcode", "~/Library/Caches/com.apple.dt.Xcode", "\(home)/Library/Caches/com.apple.dt.Xcode", .xcodeAndSimulators, .safe, false, nil),
+            ("CoreSimulator Caches", "Cachés de simuladores iOS", "~/Library/Developer/CoreSimulator/Caches", "\(home)/Library/Developer/CoreSimulator/Caches", .xcodeAndSimulators, .safe, false, nil)
         ]
 
         let scanned: [CleanableItem] = await Task.detached(priority: .userInitiated) {
@@ -1226,126 +1226,126 @@ final class SystemScannerService: ObservableObject {
         let items: [SystemDataXRayItem] = await Task.detached(priority: .userInitiated) {
             let candidates: [(title: String, category: String, explanation: String, path: String, safety: SafetyLevel, canClean: Bool, customAction: String?)] = [
                 (
-                    "Datos Internos de League of Legends",
-                    "Juegos Ocultos en 'Datos del Sistema'",
-                    "macOS clasifica los 38 GB descargados por el actualizador de Riot dentro del paquete .app como 'Datos del Sistema' en vez de Aplicaciones.",
+                    "Datos de League of Legends",
+                    "Juegos",
+                    "Archivos del juego dentro de .app",
                     "/Applications/League of Legends.app/Contents/LOL",
                     .caution,
                     true,
                     nil
                 ),
                 (
-                    "Repositorios y Proyectos en ~/main",
-                    "Carpetas fuera de Documents",
-                    "Como ~/main no es una carpeta estándar de Apple (Documents/Downloads), macOS suma todo su peso dentro de 'Datos del sistema'.",
+                    "Proyectos en ~/main",
+                    "Usuario",
+                    "Carpeta de proyectos locales",
                     "\(homeDir)/main",
                     .protected,
                     false,
                     nil
                 ),
                 (
-                    "Paquetes y Librerías de Homebrew (/opt/homebrew)",
-                    "Herramientas de Terminal",
-                    "Todos los programas y librerías instalados por Homebrew se contabilizan dentro de 'Datos del sistema'. Limpiar ejecuta 'brew cleanup --prune=all' y 'brew autoremove'.",
+                    "Homebrew (/opt/homebrew)",
+                    "Paquetes",
+                    "Ejecuta brew cleanup y autoremove",
                     "/opt/homebrew",
                     .safe,
                     true,
                     "BREW_CLEAN"
                 ),
                 (
-                    "Caché de Análisis Multimedia de Apple (mediaanalysisd)",
-                    "IA Visual de macOS",
-                    "Caché generada por macOS al escanear texto y objetos en fotos/videos. Es seguro vaciar su caché interna si creció demasiado.",
+                    "Caché de Análisis Multimedia (mediaanalysisd)",
+                    "Caché",
+                    "Caché de análisis de fotos y videos",
                     "\(homeDir)/Library/Containers/com.apple.mediaanalysisd/Data/Library/Caches",
                     .safe,
                     true,
                     nil
                 ),
                 (
-                    "Contenedor de Análisis Multimedia Completo",
-                    "Contenedor del Sistema",
-                    "Datos acumulados por el servicio com.apple.mediaanalysisd en ~/Library/Containers.",
+                    "Contenedor mediaanalysisd",
+                    "Sistema",
+                    "Contenedor en ~/Library/Containers",
                     "\(homeDir)/Library/Containers/com.apple.mediaanalysisd",
                     .protected,
                     false,
                     nil
                 ),
                 (
-                    "Paquetes de OpenAI Codex y Sesiones (~/.codex)",
-                    "Agentes IA Ocultos",
-                    "Las carpetas que empiezan con punto (como ~/.codex) son invisibles en Finder y macOS las mete íntegras en 'Datos del sistema'.",
+                    "OpenAI Codex (~/.codex)",
+                    "Dotfile",
+                    "Sesiones y paquetes locales",
                     "\(homeDir)/.codex",
                     .protected,
                     false,
                     nil
                 ),
                 (
-                    "Instalador Residual de Docker (com.docker.install)",
-                    "Instaladores de Soporte",
-                    "Archivos de instalación guardados por Docker Desktop en Application Support.",
+                    "Instalador de Docker (com.docker.install)",
+                    "Instalador",
+                    "Instalador temporal en Application Support",
                     "\(homeDir)/Library/Application Support/com.docker.install",
                     .safe,
                     true,
                     nil
                 ),
                 (
-                    "Disco Virtual de Docker Desktop (Docker.raw)",
-                    "Máquina Virtual",
-                    "Espacio reservado en disco por la máquina virtual Linux de Docker Desktop.",
+                    "Disco Virtual de Docker (Docker.raw)",
+                    "Docker",
+                    "Imagen de máquina virtual Linux",
                     "\(homeDir)/Library/Containers/com.docker.docker",
                     .caution,
                     false,
                     nil
                 ),
                 (
-                    "Entorno y Datos de Hermes (~/.hermes)",
-                    "Carpeta Oculta (Dotfile)",
-                    "Carpeta oculta en tu directorio de inicio que macOS suma a 'Datos del sistema'.",
+                    "Hermes (~/.hermes)",
+                    "Dotfile",
+                    "Datos locales en ~/.hermes",
                     "\(homeDir)/.hermes",
                     .caution,
                     true,
                     nil
                 ),
                 (
-                    "Fondos Animados de Backdrop",
-                    "Application Support",
-                    "Videos y fondos pesados descargados por Backdrop en ~/Library/Application Support.",
+                    "Fondos de Backdrop",
+                    "Multimedia",
+                    "Videos descargados en Application Support",
                     "\(homeDir)/Library/Application Support/Backdrop",
                     .caution,
                     true,
                     nil
                 ),
                 (
-                    "Documentación Offline de Apple Developer (AssetsV2)",
-                    "Assets de Sistema (SIP)",
-                    "Catálogos descargados en segundo plano por macOS para Xcode y Siri en /System/Library/AssetsV2.",
+                    "Catálogos de Sistema (AssetsV2)",
+                    "Sistema",
+                    "Archivos internos de macOS (/System/Library/AssetsV2)",
                     "/System/Volumes/Data/System/Library/AssetsV2",
                     .protected,
                     false,
                     nil
                 ),
                 (
-                    "Cachés Temporales del Kernel y Apps (/private/var/folders)",
-                    "Temporales de Bajo Nivel",
-                    "Archivos de caché por usuario creados por procesos del sistema en /private/var/folders.",
+                    "Temporales de Sistema (/private/var/folders)",
+                    "Sistema",
+                    "Cachés temporales de procesos",
                     "/System/Volumes/Data/private/var/folders",
                     .protected,
                     false,
                     nil
                 ),
                 (
-                    "Librerías Globales de Python (~/Library/Python)",
-                    "Runtimes de Lenguajes",
-                    "Paquetes instalados con pip a nivel de usuario fuera de entornos virtuales.",
+                    "Paquetes de Python (~/Library/Python)",
+                    "Python",
+                    "Librerías pip globales de usuario",
                     "\(homeDir)/Library/Python",
                     .caution,
                     true,
                     nil
                 ),
                 (
-                    "Módulos y Caché de Go (~/go)",
-                    "Runtimes de Lenguajes",
-                    "Binarios y módulos descargados por Go en tu carpeta de usuario.",
+                    "Caché y Módulos de Go (~/go)",
+                    "Go",
+                    "Ejecuta go clean -modcache",
                     "\(homeDir)/go",
                     .caution,
                     true,
@@ -1383,7 +1383,7 @@ final class SystemScannerService: ObservableObject {
         currentOperationTitle = "Liberando \(item.title)..."
         defer { isExecutingOperation = false }
 
-        appendLog("Iniciando limpieza en Datos del Sistema: \(item.title)", detail: item.path, level: .info)
+        appendLog("Limpiando: \(item.title)", detail: item.path, level: .info)
 
         await Task.detached(priority: .userInitiated) {
             let fm = FileManager.default
@@ -1401,8 +1401,8 @@ final class SystemScannerService: ObservableObject {
         }.value
 
         recordFreedSpace(item.customAction == "BREW_CLEAN" ? 120 * 1024 * 1024 : item.sizeBytes)
-        appendLog("Espacio liberado en: \(item.title)", detail: item.path, level: .success)
-        lastStatusMessage = "Se liberó '\(item.title)' (\(ByteFormatter.string(from: item.sizeBytes)))."
+        appendLog("Liberado: \(item.title)", detail: item.path, level: .success)
+        lastStatusMessage = "\(item.title) liberado (\(ByteFormatter.string(from: item.sizeBytes)))"
         await scanSystemDataXRay()
         refreshDiskOverview()
     }
@@ -1442,9 +1442,9 @@ final class SystemScannerService: ObservableObject {
                         let candidate = "\(base)/\(sub)"
                         if fm.fileExists(atPath: candidate) {
                             rawCandidates.append((
-                                title: "\(appFolder) → \(sub)",
-                                context: "Cirugía interna en Application Support/\(appFolder)",
-                                preserved: "Conserva tus cuentas, sesiones abiertas, extensiones y preferencias de \(appFolder).",
+                                title: "\(appFolder) · \(sub)",
+                                context: "Application Support/\(appFolder)",
+                                preserved: "Caché temporal de \(appFolder)",
                                 path: candidate,
                                 category: .appSupportSurgery,
                                 safety: .safe,
@@ -1455,15 +1455,15 @@ final class SystemScannerService: ObservableObject {
                 }
             }
 
-            // Specific Chrome Default profile internal cache bloat (without touching Cookies, Login Data, Bookmarks, or Extensions)
+            // Specific Chrome Default profile internal cache bloat
             let chromeDefault = "\(appSupportDir)/Google/Chrome/Default"
             for chromeSub in ["Service Worker", "GPUCache", "DawnWebGPUCache", "DawnGraphiteCache", "Code Cache"] {
                 let p = "\(chromeDefault)/\(chromeSub)"
                 if fm.fileExists(atPath: p) {
                     rawCandidates.append((
-                        title: "Google Chrome → \(chromeSub)",
-                        context: "Caché interna de perfil de Chrome en Application Support",
-                        preserved: "100% seguro: Tus contraseñas, pestañas, historial, cookies y sesiones de Google Chrome NO se tocan.",
+                        title: "Google Chrome · \(chromeSub)",
+                        context: "Application Support/Google/Chrome",
+                        preserved: "Caché temporal de Chrome",
                         path: p,
                         category: .appSupportSurgery,
                         safety: .safe,
@@ -1472,13 +1472,13 @@ final class SystemScannerService: ObservableObject {
                 }
             }
 
-            // GoogleUpdater (814+ MB of old Chrome update packages in Application Support/Google/GoogleUpdater)
+            // GoogleUpdater
             let googleUpdaterPath = "\(appSupportDir)/Google/GoogleUpdater"
             if fm.fileExists(atPath: googleUpdaterPath) {
                 rawCandidates.append((
-                    title: "Actualizaciones Antiguas de Google (GoogleUpdater)",
-                    context: "Instaladores viejos de Chrome en Application Support/Google/GoogleUpdater",
-                    preserved: "100% seguro: Google Chrome sigue funcionando normal con todas tus cuentas y sesiones.",
+                    title: "GoogleUpdater",
+                    context: "Application Support/Google/GoogleUpdater",
+                    preserved: "Instaladores antiguos de Google",
                     path: googleUpdaterPath,
                     category: .appSupportSurgery,
                     safety: .safe,
@@ -1486,15 +1486,15 @@ final class SystemScannerService: ObservableObject {
                 ))
             }
 
-            // Chrome top-level model & shader caches inside Application Support/Google/Chrome
+            // Chrome top-level model & shader caches
             let chromeRoot = "\(appSupportDir)/Google/Chrome"
             for chromeTopSub in ["OptGuideOnDeviceModel", "OptimizationGuidePredictionModels", "ComponentCRXCache", "ShaderCache", "GrShaderCache", "GraphiteDawnCache", "BrowserMetrics"] {
                 let p = "\(chromeRoot)/\(chromeTopSub)"
                 if fm.fileExists(atPath: p) {
                     rawCandidates.append((
-                        title: "Google Chrome → \(chromeTopSub)",
-                        context: "Modelos y cachés descargadas por Chrome en Application Support",
-                        preserved: "100% seguro: Tus contraseñas, pestañas, marcadores y sesiones de Chrome quedan intactas.",
+                        title: "Google Chrome · \(chromeTopSub)",
+                        context: "Application Support/Google/Chrome",
+                        preserved: "Caché interna de Chrome",
                         path: p,
                         category: .appSupportSurgery,
                         safety: .safe,
@@ -1503,13 +1503,13 @@ final class SystemScannerService: ObservableObject {
                 }
             }
 
-            // Docker Stale Installer inside Application Support (2.26 GB in_progress)
+            // Docker Stale Installer inside Application Support
             let dockerInstall = "\(appSupportDir)/com.docker.install"
             if fm.fileExists(atPath: dockerInstall) {
                 rawCandidates.append((
-                    title: "Instalador Residual de Docker (com.docker.install)",
-                    context: "Actualizador estancado en Application Support",
-                    preserved: "Tu app Docker Desktop y tus contenedores actuales siguen intactos.",
+                    title: "Docker · com.docker.install",
+                    context: "Application Support/com.docker.install",
+                    preserved: "Instalador temporal de Docker",
                     path: dockerInstall,
                     category: .appSupportSurgery,
                     safety: .safe,
@@ -1518,13 +1518,13 @@ final class SystemScannerService: ObservableObject {
             }
 
             // Zed auto-downloaded language servers & local node runtime inside Application Support
-            for (sub, desc) in [("languages", "Servidores LSP descargados por Zed"), ("node", "Runtime Node interno de Zed"), ("prettier", "Instancia Prettier de Zed")] {
+            for (sub, desc) in [("languages", "Servidores LSP"), ("node", "Runtime Node"), ("prettier", "Prettier")] {
                 let p = "\(appSupportDir)/Zed/\(sub)"
                 if fm.fileExists(atPath: p) {
                     rawCandidates.append((
-                        title: "Zed Editor → \(sub) (\(desc))",
-                        context: "Binarios auto-descargables en Application Support/Zed",
-                        preserved: "Tus settings.json, keymaps y temas de Zed quedan intactos; Zed descarga solo los lenguajes que vuelvas a abrir.",
+                        title: "Zed · \(sub)",
+                        context: "Application Support/Zed",
+                        preserved: desc,
                         path: p,
                         category: .appSupportSurgery,
                         safety: .safe,
@@ -1533,33 +1533,33 @@ final class SystemScannerService: ObservableObject {
                 }
             }
 
-            // 2. GHOST / UNINSTALLED APPS IN APPLICATION SUPPORT (Apps no longer in /Applications)
+            // 2. GHOST / UNINSTALLED APPS IN APPLICATION SUPPORT
             let installedAppNames = Set(((try? fm.contentsOfDirectory(atPath: "/Applications")) ?? []).map {
                 ($0 as NSString).deletingPathExtension.lowercased()
             })
 
             let knownGhostCandidates: [(folder: String, displayName: String, checkName: String)] = [
-                ("Claude", "Claude Desktop / Claude Code VM", "claude"),
-                ("zoom.us", "Zoom Video Communications", "zoom.us"),
-                ("Postman", "Postman API Client", "postman"),
+                ("Claude", "Claude Desktop", "claude"),
+                ("zoom.us", "Zoom", "zoom.us"),
+                ("Postman", "Postman", "postman"),
                 ("BraveSoftware", "Brave Browser", "brave browser"),
                 ("Trae", "Trae IDE", "trae"),
                 ("Windsurf", "Windsurf IDE", "windsurf"),
-                ("Codex", "Codex Desktop Data", "codex"),
-                ("CodexBackups", "Respaldos Antiguos de Codex", "codex"),
-                ("dbpepe", "Datos de dbpepe", "dbpepe"),
-                ("jellyfin", "Servidor Jellyfin", "jellyfin"),
-                ("orca", "Orca App Data", "orca"),
-                ("Riot Client", "Riot Games Client Data", "riot client")
+                ("Codex", "Codex", "codex"),
+                ("CodexBackups", "Codex Backups", "codex"),
+                ("dbpepe", "dbpepe", "dbpepe"),
+                ("jellyfin", "Jellyfin", "jellyfin"),
+                ("orca", "Orca", "orca"),
+                ("Riot Client", "Riot Client", "riot client")
             ]
 
             for ghost in knownGhostCandidates {
                 let p = "\(appSupportDir)/\(ghost.folder)"
                 if fm.fileExists(atPath: p) && !installedAppNames.contains(ghost.checkName) {
                     rawCandidates.append((
-                        title: "Residuos de \(ghost.displayName) (App ya no instalada)",
-                        context: "Carpeta huérfana en ~/Library/Application Support/\(ghost.folder)",
-                        preserved: "La aplicación '\(ghost.displayName)' ya no existe en /Applications, pero dejó estos datos ocupando espacio.",
+                        title: ghost.displayName,
+                        context: "Application Support/\(ghost.folder)",
+                        preserved: "App desinstalada",
                         path: p,
                         category: .orphanedAppsData,
                         safety: .safe,
@@ -1568,7 +1568,7 @@ final class SystemScannerService: ObservableObject {
                 }
             }
 
-            // 3. DUPLICATE LANGUAGE RUNTIMES & OLD VERSIONS (.nvm, .pyenv, ~/Library/Python)
+            // 3. DUPLICATE LANGUAGE RUNTIMES & OLD VERSIONS
             let nvmNodeDir = "\(homeDir)/.nvm/versions/node"
             if let versions = try? fm.contentsOfDirectory(atPath: nvmNodeDir) {
                 let sortedVers = versions.filter { $0.hasPrefix("v") }.sorted()
@@ -1577,9 +1577,9 @@ final class SystemScannerService: ObservableObject {
                     for oldVer in sortedVers.dropLast() {
                         let p = "\(nvmNodeDir)/\(oldVer)"
                         rawCandidates.append((
-                            title: "Versión Antigua de Node.js (\(oldVer)) en ~/.nvm",
-                            context: "Tienes múltiples versiones de Node instaladas",
-                            preserved: "Se conserva tu versión más reciente de Node (\(newest)) intacta.",
+                            title: "Node.js \(oldVer)",
+                            context: "~/.nvm/versions/node",
+                            preserved: "Versión anterior (actual: \(newest))",
                             path: p,
                             category: .duplicateRuntimes,
                             safety: .caution,
@@ -1594,9 +1594,9 @@ final class SystemScannerService: ObservableObject {
                 for v in pyVers where !v.hasPrefix(".") {
                     let p = "\(pyenvVersDir)/\(v)"
                     rawCandidates.append((
-                        title: "Toolchain de Python en ~/.pyenv (\(v))",
-                        context: "Versión compilada en ~/.pyenv/versions/\(v)",
-                        preserved: "El Python de Homebrew y del sistema siguen funcionando.",
+                        title: "Python \(v) (pyenv)",
+                        context: "~/.pyenv/versions/\(v)",
+                        preserved: "Versión en ~/.pyenv",
                         path: p,
                         category: .duplicateRuntimes,
                         safety: .caution,
@@ -1608,9 +1608,9 @@ final class SystemScannerService: ObservableObject {
             let userLibPython = "\(homeDir)/Library/Python"
             if fm.fileExists(atPath: userLibPython) {
                 rawCandidates.append((
-                    title: "Paquetes Globales de Python (~/Library/Python)",
-                    context: "Librerías pip instaladas fuera de entornos virtuales",
-                    preserved: "Tus entornos .venv de proyectos no se ven afectados.",
+                    title: "Python (~/Library/Python)",
+                    context: "~/Library/Python",
+                    preserved: "Paquetes globales pip",
                     path: userLibPython,
                     category: .duplicateRuntimes,
                     safety: .caution,
@@ -1622,9 +1622,9 @@ final class SystemScannerService: ObservableObject {
             let appleAerials = "\(appSupportDir)/com.apple.wallpaper/aerials"
             if fm.fileExists(atPath: appleAerials) {
                 rawCandidates.append((
-                    title: "Videos 4K de Salvapantallas de macOS (com.apple.wallpaper/aerials)",
-                    context: "Videos aéreos descargados en segundo plano por macOS",
-                    preserved: "100% seguro: Tu fondo de pantalla estático no falla y macOS solo descarga videos si los eliges.",
+                    title: "Videos 4K de macOS (aerials)",
+                    context: "com.apple.wallpaper/aerials",
+                    preserved: "Salvapantallas en video",
                     path: appleAerials,
                     category: .macOSWallpaperAndMedia,
                     safety: .safe,
@@ -1636,9 +1636,9 @@ final class SystemScannerService: ObservableObject {
                 if fm.fileExists(atPath: backdropSub) {
                     let name = (backdropSub as NSString).lastPathComponent
                     rawCandidates.append((
-                        title: "Videos Animados Descargados de Backdrop (\(name))",
-                        context: "Biblioteca de fondos en video en Application Support",
-                        preserved: "La app Backdrop sigue instalada; solo libera los videos pesados almacenados en disco.",
+                        title: "Backdrop (\(name))",
+                        context: "Application Support/Backdrop",
+                        preserved: "Fondos en video",
                         path: backdropSub,
                         category: .macOSWallpaperAndMedia,
                         safety: .caution,
@@ -1647,23 +1647,23 @@ final class SystemScannerService: ObservableObject {
                 }
             }
 
-            // 5. HIDDEN DOTFILE BLOAT (~/.claude, ~/.local, ~/.npm, ~/.codegraph, ~/.grok, ~/.pi, ~/.flet)
+            // 5. HIDDEN DOTFILE BLOAT
             let dotfileTargets: [(title: String, path: String, preserved: String, safe: Bool)] = [
-                ("Historial Pesado de Sesiones de Claude CLI (~/.claude/projects)", "\(homeDir)/.claude/projects", "Tus credenciales y settings.json de Claude se conservan.", true),
-                ("Historial de Archivos de Claude (~/.claude/file-history)", "\(homeDir)/.claude/file-history", "Tus configuraciones de Claude quedan intactas.", true),
-                ("Plugins y Cachés de Neovim (~/.local/share/nvim)", "\(homeDir)/.local/share/nvim", "Tu configuración en ~/.config/nvim (init.lua) no se toca.", false),
-                ("Entornos Compartidos de uv (~/.local/share/uv)", "\(homeDir)/.local/share/uv", "Se regeneran automáticamente con uv.", true),
-                ("Índice Local de Codegraph (~/.codegraph)", "\(homeDir)/.codegraph", "Índice regenerable de análisis de código.", true),
-                ("Datos Ocultos de Grok CLI (~/.grok)", "\(homeDir)/.grok", "Caché y datos locales en ~/.grok.", false),
-                ("Datos Ocultos de Pi (~/.pi)", "\(homeDir)/.pi", "Datos almacenados en ~/.pi.", false),
-                ("SDK Oculto de Flet (~/.flet)", "\(homeDir)/.flet", "Binarios descargados por Flet UI.", true),
-                ("Checkpoints SQLite de Pine (~/.pine_checkpoints.sqlite)", "\(homeDir)/.pine_checkpoints.sqlite", "Archivo de checkpoints instantáneos en tu carpeta Home.", true)
+                ("Claude CLI (~/.claude/projects)", "\(homeDir)/.claude/projects", "Historial de proyectos", true),
+                ("Claude CLI (~/.claude/file-history)", "\(homeDir)/.claude/file-history", "Historial de archivos", true),
+                ("Neovim (~/.local/share/nvim)", "\(homeDir)/.local/share/nvim", "Plugins y datos locales", false),
+                ("uv (~/.local/share/uv)", "\(homeDir)/.local/share/uv", "Entornos cacheados de uv", true),
+                ("Codegraph (~/.codegraph)", "\(homeDir)/.codegraph", "Índice local", true),
+                ("Grok CLI (~/.grok)", "\(homeDir)/.grok", "Datos locales", false),
+                ("Pi (~/.pi)", "\(homeDir)/.pi", "Datos locales", false),
+                ("Flet (~/.flet)", "\(homeDir)/.flet", "Binarios de Flet", true),
+                ("Pine (~/.pine_checkpoints.sqlite)", "\(homeDir)/.pine_checkpoints.sqlite", "Base SQLite de checkpoints", true)
             ]
 
             for dot in dotfileTargets where fm.fileExists(atPath: dot.path) {
                 rawCandidates.append((
                     title: dot.title,
-                    context: "Carpeta oculta en tu directorio de inicio (~/)",
+                    context: "~/",
                     preserved: dot.preserved,
                     path: dot.path,
                     category: .hiddenDotfileBloat,
@@ -2053,13 +2053,13 @@ final class SystemScannerService: ObservableObject {
             if totalSqliteBytes > 1024 * 1024 {
                 deepItems.append(MSeriesDeepItem(
                     identifier: "sqlite_vacuum_all",
-                    title: "Compactación sin Pérdida de Bases SQLite (VACUUM)",
-                    subtitle: "Desfragmenta y recupera páginas vacías en \(sqliteCandidates.count) bases SQLite (Chrome, Safari, Codex, índices) sin borrar un solo dato ni cerrar sesiones.",
-                    technicalDetail: "Ejecuta 'sqlite3 <db> VACUUM;' en bases locales (\(ByteFormatter.string(from: totalSqliteBytes)) analizados)",
+                    title: "Compactar bases SQLite (VACUUM)",
+                    subtitle: "\(sqliteCandidates.count) bases de datos locales",
+                    technicalDetail: "sqlite3 VACUUM (\(ByteFormatter.string(from: totalSqliteBytes)))",
                     kind: .sqliteVacuum,
-                    sizeBytes: totalSqliteBytes / 4, // Typical reclaimable page fragmentation
+                    sizeBytes: totalSqliteBytes / 4,
                     safety: .safe,
-                    actionButtonTitle: "Compactar SQLite",
+                    actionButtonTitle: "Compactar",
                     actionCode: "SQLITE_VACUUM",
                     targetPath: sqliteCandidates.first
                 ))
@@ -2075,13 +2075,13 @@ final class SystemScannerService: ObservableObject {
             if totalDiag > 128 * 1024 {
                 deepItems.append(MSeriesDeepItem(
                     identifier: "rosetta_and_diagnostics",
-                    title: "Volcados de Memoria y Reportes de Fallos (.ips / CrashReporter)",
-                    subtitle: "Archivos de diagnóstico generados cuando una app o proceso traducido por Rosetta 2 se cierra inesperadamente.",
+                    title: "Reportes de fallos (.ips / CrashReporter)",
+                    subtitle: "Registros de diagnósticos",
                     technicalDetail: "~/Library/Logs/DiagnosticReports",
                     kind: .binaryArchitecture,
                     sizeBytes: totalDiag,
                     safety: .safe,
-                    actionButtonTitle: "Limpiar Reportes",
+                    actionButtonTitle: "Limpiar",
                     actionCode: "CLEAN_PATH",
                     targetPath: "\(homeDir)/Library/Logs/DiagnosticReports"
                 ))
@@ -2089,10 +2089,10 @@ final class SystemScannerService: ObservableObject {
 
             // C) Neural Engine / Local AI Weights & Runtimes
             let aiPaths: [(name: String, path: String, desc: String)] = [
-                ("Modelos Locales de Ollama (~/.ollama)", "\(homeDir)/.ollama/models", "Pesos de modelos LLM locales para Apple Neural Engine / Metal GPU."),
-                ("Modelos de LM Studio (~/.cache/lm-studio)", "\(homeDir)/.cache/lm-studio", "Modelos GGUF/MLX descargados por LM Studio."),
-                ("Checkpoints Locales de Pine (~/.pine_checkpoints.sqlite)", "\(homeDir)/.pine_checkpoints.sqlite", "Base de checkpoints instantáneos en tu carpeta de inicio."),
-                ("Caché de Apple MediaAnalysisD (Neural Engine Vision)", "\(homeDir)/Library/Containers/com.apple.mediaanalysisd/Data/Library/Caches", "Caché temporal de inferencia visual generada por el Neural Engine.")
+                ("Modelos de Ollama (~/.ollama)", "\(homeDir)/.ollama/models", "Modelos LLM locales"),
+                ("Modelos de LM Studio (~/.cache/lm-studio)", "\(homeDir)/.cache/lm-studio", "Modelos GGUF/MLX"),
+                ("Checkpoints de Pine (~/.pine_checkpoints.sqlite)", "\(homeDir)/.pine_checkpoints.sqlite", "Base SQLite local"),
+                ("Caché MediaAnalysisD", "\(homeDir)/Library/Containers/com.apple.mediaanalysisd/Data/Library/Caches", "Caché de análisis multimedia")
             ]
             let existingAI = aiPaths.filter { fm.fileExists(atPath: $0.path) }
             let aiSizes = Self.batchSizesForPaths(existingAI.map(\.path))
@@ -2122,13 +2122,13 @@ final class SystemScannerService: ObservableObject {
                 if qlSize > 5 * 1024 * 1024 {
                     deepItems.append(MSeriesDeepItem(
                         identifier: "darwin_quicklook_cache",
-                        title: "Caché de Miniaturas QuickLook y Metal Shaders (DARWIN_USER_CACHE)",
-                        subtitle: "Miniaturas pre-renderizadas y shaders compilados de GPU de Apple Silicon en /var/folders. Se regeneran bajo demanda.",
+                        title: "Caché de QuickLook y Shaders",
+                        subtitle: "Miniaturas y caché gráfica en /var/folders",
                         technicalDetail: "qlmanage -r cache · \(qlCacheOut)",
                         kind: .apfsSnapshotsAndSwap,
                         sizeBytes: qlSize,
                         safety: .safe,
-                        actionButtonTitle: "Purgar QuickLook",
+                        actionButtonTitle: "Limpiar",
                         actionCode: "QL_RESET",
                         targetPath: qlCacheOut
                     ))
@@ -2138,19 +2138,19 @@ final class SystemScannerService: ObservableObject {
             if status.localSnapshotsCount > 0 {
                 deepItems.append(MSeriesDeepItem(
                     identifier: "apfs_snapshots_thin",
-                    title: "Adelgazar \(status.localSnapshotsCount) Instantáneas APFS Locales",
-                    subtitle: "macOS retiene bloques borrados en instantáneas invisibles de APFS. Solicitar 'tmutil thinlocalsnapshots' libera bloques retenidos de forma 100% nativa.",
+                    title: "Instantáneas APFS locales (\(status.localSnapshotsCount))",
+                    subtitle: "Liberar snapshots locales de Time Machine / APFS",
                     technicalDetail: "tmutil thinlocalsnapshots / 10000000000 4",
                     kind: .apfsSnapshotsAndSwap,
                     sizeBytes: 0,
                     safety: .safe,
-                    actionButtonTitle: "Liberar Bloques APFS",
+                    actionButtonTitle: "Liberar",
                     actionCode: "APFS_THIN",
                     targetPath: nil
                 ))
             }
 
-            // E) Orphaned LaunchAgents (broken plists pointing to non-existent binaries)
+            // E) Orphaned LaunchAgents
             let launchAgentsDir = "\(homeDir)/Library/LaunchAgents"
             if let plists = try? fm.contentsOfDirectory(atPath: launchAgentsDir) {
                 for plist in plists where plist.hasSuffix(".plist") {
@@ -2165,13 +2165,13 @@ final class SystemScannerService: ObservableObject {
                     if let bin = execCandidate, bin.hasPrefix("/"), !bin.hasPrefix("/bin/"), !bin.hasPrefix("/usr/bin/"), !fm.fileExists(atPath: bin) {
                         deepItems.append(MSeriesDeepItem(
                             identifier: "orphan_agent_\(plist)",
-                            title: "Agente de Inicio Huérfano: \(plist)",
-                            subtitle: "Intenta ejecutar en segundo plano un binario que ya fue desinstalado (\(bin)).",
+                            title: "LaunchAgent huérfano: \(plist)",
+                            subtitle: "Ejecutable no encontrado: \(bin)",
                             technicalDetail: fullPlist,
                             kind: .backgroundAgents,
                             sizeBytes: 4096,
                             safety: .safe,
-                            actionButtonTitle: "Eliminar Agente",
+                            actionButtonTitle: "Eliminar",
                             actionCode: "CLEAN_PATH",
                             targetPath: fullPlist
                         ))

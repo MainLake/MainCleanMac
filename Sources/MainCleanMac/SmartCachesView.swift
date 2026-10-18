@@ -22,29 +22,10 @@ struct SmartCachesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Top Lens Header
+            // Top Header
             HStack(alignment: .center, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 10) {
-                        Text(scanner.isAdvancedMode ? "Cachés y Paquetes" : "Archivos Temporales")
-                            .font(.system(size: 24, weight: .bold))
-                        if scanner.isAdvancedMode {
-                            Text("TEMPORALES Y PAQUETES")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(MainCleanTheme.accentBlue)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(MainCleanTheme.accentBlue.opacity(0.14), in: Capsule())
-                        }
-                    }
-                    Text(
-                        scanner.isAdvancedMode
-                            ? "Elimina cachés regenerables de navegadores, gestores de paquetes y registros sin cerrar tus sesiones."
-                            : "Archivos temporales que tus programas guardan mientras los usas. Puedes borrarlos con total tranquilidad."
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
+                Text(scanner.isAdvancedMode ? "Cachés y Paquetes" : "Archivos Temporales")
+                    .font(.system(size: 22, weight: .bold))
 
                 Spacer()
 

@@ -25,29 +25,10 @@ struct AppUninstallerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Top Lens Header
+            // Top Header
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 10) {
-                        Text(scanner.isAdvancedMode ? "Desinstalador Completo" : "Mis Aplicaciones")
-                            .font(.system(size: 24, weight: .bold))
-                        if scanner.isAdvancedMode {
-                            Text("APPS Y RESTOS DE DESINSTALACIÓN")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(MainCleanTheme.crimsonDanger)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(MainCleanTheme.crimsonDanger.opacity(0.14), in: Capsule())
-                        }
-                    }
-                    Text(
-                        scanner.isAdvancedMode
-                            ? "Desinstala aplicaciones junto con sus carpetas ocultas o elimina restos de programas que ya borraste antes."
-                            : "Al borrar una app normalmente quedan archivos ocultos en tu Mac. Aquí puedes borrarla por completo sin dejar rastro."
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
+                Text(scanner.isAdvancedMode ? "Desinstalador" : "Aplicaciones")
+                    .font(.system(size: 22, weight: .bold))
 
                 Spacer()
 
