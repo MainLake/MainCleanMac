@@ -13,6 +13,11 @@ let package = Package(
         .executableTarget(
             name: "MainCleanMac",
             path: "Sources/MainCleanMac"
+        ),
+        .testTarget(
+            name: "MainCleanMacTests",
+            dependencies: ["MainCleanMac"],
+            path: "Tests/MainCleanMacTests"
         )
     ]
 )
